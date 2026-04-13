@@ -1,569 +1,241 @@
-# Company Profile Agent
+# RMATSS MVP - Reinforced Multi-Agent Tutoring System for Schools
 
-A sophisticated financial analyst tool that transforms French fiscal bundles (liasses fiscales) into comprehensive company profiles using advanced AI technology.
+A comprehensive web-based AI tutoring platform integrating multi-agent reinforcement learning principles with Claude AI, designed for realistic school deployment.
 
-**Developed by:** Digrow
+## Overview
 
-## 🚀 Features
+RMATSS provides:
+- **AI-Powered Tutoring**: Subject-specific AI tutors (Math, Physics) using Claude API with RAG
+- **Multi-Role Dashboards**: Dedicated interfaces for Students, Teachers, and Parents
+- **Intelligent Agents**: Orientation Agent, Geofencing Agent, and Subject Tutors sharing pedagogical memory
+- **Reinforcement Learning**: Built-in reward tracking and episodic logging for continuous improvement
 
-### Frontend
-- **Modern React Application** with TypeScript-style architecture
-- **Responsive Design** optimized for desktop and tablet
-- **Authentication System** with JWT-based security
-- **Interactive Dashboard** with real-time statistics
-- **Drag & Drop File Upload** with validation and progress indicators
-- **Company Profiles Management** with pagination and search
-- **Smooth Animations** using Framer Motion
-- **Professional UI** with Tailwind CSS
+## Tech Stack
 
-### Backend
-- **Flask API** with PostgreSQL database
-- **JWT Authentication** for secure access
-- **File Upload System** with validation (max 3 files, 16MB each)
-- **Document Processing** with Claude AI OCR integration
-- **Multi-Service Architecture** with specialized modules:
-  - **Financial Reporting**: AI-powered SWOT analysis and recommendations
-  - **Web Exploring**: Company data extraction from websites and business directories
-  - **News Retrieval**: Real-time news analysis and sector monitoring
-  - **Profile Verification**: Smart document validation and duplicate detection
-  - **Benchmark Module**: Compare different LLM models (Anthropic Claude vs OpenAI ChatGPT)
-- **Report Generation System** with HTML templates and PDF export
-- **Automatic File Cleanup** to optimize server storage
-- **RESTful API** endpoints for all operations
-- **Database Schema** optimized for financial data
+- **Frontend**: React 18 with Material-UI
+- **Backend**: Node.js + Express
+- **Database**: PostgreSQL with Sequelize ORM
+- **AI**: Anthropic Claude API (via @anthropic-ai/sdk)
+- **Vector Store**: ChromaDB for RAG document retrieval
+- **Embeddings**: OpenAI API for document vectorization
 
-### Infrastructure
-- **Docker Compose** setup for easy deployment
-- **PostgreSQL Database** with optimized indexes
-- **Production-ready** configuration
-- **Cross-platform** compatibility (Windows dev, Debian deployment)
+## Features
 
-## 🛠 Tech Stack
+### Student Dashboard
+- AI tutor Q&A interface with three modes (Recall, Diagnostic, Scaffold)
+- Personalized feedback and session history
+- Orientation suggestions for learning path guidance
+- Attendance check-in/out
+- Progress tracking and performance metrics
 
-### Frontend
-- React 18
-- React Router DOM
-- Framer Motion (animations)
-- Tailwind CSS (styling)
-- Axios (HTTP client)
-- React Hot Toast (notifications)
-- React Dropzone (file upload)
-- Lucide React (icons)
+### Teacher Dashboard
+- Upload and manage course materials (RAG content)
+- Monitor AI-student interactions with full transcripts
+- Performance analytics (individual and class-wide)
+- Evaluate AI scaffolding quality
+- Provide meta-feedback on AI pedagogy
+- Override AI responses when necessary
 
-### Backend
-- Python 3.11
-- Flask 2.3
-- PostgreSQL 15
-- SQLAlchemy (ORM)
-- Flask-JWT-Extended (authentication)
-- Anthropic Claude (AI/OCR)
-- Python-magic (file type detection)
-- Playwright (web scraping)
-- Tavily Search (news retrieval)
-- SerpAPI (Google Search)
-- BeautifulSoup4 (HTML parsing)
-- LangChain (AI integration)
+### Parent Dashboard
+- Attendance and geofencing logs with anomaly alerts
+- Performance overview with trend visualization
+- Session activity reports
+- AI tutor effectiveness metrics
+- Orientation agent updates and recommendations
 
-### DevOps
-- Docker & Docker Compose
-- PostgreSQL with persistent volumes
-- Environment-based configuration
+### AI Agents
 
-## 📋 Prerequisites
+1. **Subject Tutors (Math & Physics)**
+   - RAG-based answers with source citations
+   - Three interaction modes: Recall, Diagnostic, Scaffold
+   - Episodic learning with reward tracking
 
-- Docker and Docker Compose
-- Python 3.11+ (for local development)
-- Node.js 18+ (for local frontend development)
+2. **Orientation Agent**
+   - Longitudinal student analysis
+   - Personalized learning path suggestions
+   - Early warning system for academic issues
+   - Study strategy recommendations
 
-## 🚀 Quick Start
+3. **Geofencing Agent**
+   - Attendance monitoring and logging
+   - Anomaly detection (late, early departure, absence)
+   - Automated alerts to parents/teachers
 
-### Using Docker (Recommended)
+### Pedagogical Flow Shared Memory (PFSM)
+- Centralized learner state across all agents
+- Knowledge tracing and mastery modeling
+- Cross-subject collaboration
+- Persistent student profiles
 
-1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd company-profile-agent
-   ```
+## Installation
 
-2. **Start the application:**
-   ```bash
-   docker-compose up -d
-   ```
-
-3. **Access the application:**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:5000
-   - Database: localhost:5432
-
-4. **Default Login Credentials:**
-   - Email: `admin@finsightai.com`
-   - Password: `admin123`
-
-### Local Development
-
-#### Backend Setup
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# Set environment variables
-export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/company_profile_db"
-export JWT_SECRET_KEY="your-secret-key"
-
-python app.py
-```
-
-#### Frontend Setup
-```bash
-cd frontend
-npm install
-npm start
-```
-
-## 📁 Project Structure
-
-```
-company-profile-agent/
-├── backend/
-│   ├── app.py                 # Main Flask application
-│   ├── config.py              # Configuration management
-│   ├── init.sql               # Database initialization
-│   ├── requirements.txt       # Python dependencies
-│   ├── services/              # Service modules
-│   │   ├── doc_processing.py  # Document OCR and KPI extraction
-│   │   ├── financial_reporting.py  # AI-powered financial analysis
-│   │   ├── web_exploring.py   # Company data extraction
-│   │   ├── news_retrieving.py # News analysis and monitoring
-│   │   ├── profile_verification.py  # Smart validation
-│   │   ├── send_email.py      # Email notifications
-│   │   ├── bizafrix_web.py    # Bizafrix integration
-│   │   └── charika_web.py     # Charika integration
-│   ├── static/                # Static assets
-│   ├── uploads/               # File upload directory
-│   └── Dockerfile
-├── benchmark/                 # Benchmark module for LLM comparison
-│   ├── __init__.py           # Module initialization
-│   ├── config.py             # Benchmark configuration
-│   ├── llm_services.py       # LLM service implementations
-│   ├── benchmark_analysis.py # Main analysis service
-│   ├── routes.py             # API routes
-│   ├── test_benchmark.py     # Test script
-│   ├── setup_benchmark.py    # Setup script
-│   └── README.md             # Benchmark documentation
-├── frontend/
-│   ├── src/
-│   │   ├── components/        # React components
-│   │   │   ├── Auth/          # Authentication components
-│   │   │   ├── Dashboard/     # Dashboard components
-│   │   │   ├── Layout/        # Layout components
-│   │   │   ├── Profiles/      # Profile management
-│   │   │   └── UI/           # Reusable UI components
-│   │   ├── contexts/          # React contexts
-│   │   ├── report_template/   # HTML report templates
-│   │   ├── js/               # JavaScript utilities
-│   │   ├── css/              # Stylesheets
-│   │   └── App.js            # Main React application
-│   ├── tailwind.config.js     # Tailwind configuration
-│   ├── package.json
-│   └── Dockerfile
-├── docker-compose.yml         # Docker Compose configuration
-└── README.md
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-Create appropriate environment variables for production:
-
-#### Backend Environment Variables
-```bash
-DATABASE_URL=postgresql://postgres:postgres@db:5432/company_profile_db
-JWT_SECRET_KEY=your-super-secret-jwt-key
-ANTHROPIC_API_KEY=your-anthropic-api-key
-OPENAI_API_KEY=your-openai-api-key
-TAVILY_API_KEY=your-tavily-search-api-key
-SERPAPI_API_KEY=your-serpapi-google-search-key
-FLASK_ENV=production
-SECRET_KEY=your-flask-secret-key
-```
-
-#### Frontend Environment Variables
-```bash
-REACT_APP_API_URL=http://your-backend-url
-```
-
-## 🔬 Benchmark Module
-
-The benchmark module allows you to compare different LLM models (Anthropic Claude vs OpenAI ChatGPT) for generating financial analysis reports. This helps you evaluate which model performs best for your specific use case.
-
-### Features
-
-- **Multi-Model Comparison**: Compare analysis results from different LLM providers
-- **Same Prompts**: Uses identical system prompts and data context as the main application
-- **Side-by-Side Analysis**: View SWOT analysis, recommendations, and detailed analysis from each model
-- **Error Handling**: Graceful fallback when APIs are unavailable
-- **Real-time Testing**: Test with actual company profile data
+### Prerequisites
+- Node.js (v18+)
+- PostgreSQL (v14+)
+- ChromaDB (optional, for full RAG functionality)
 
 ### Setup
 
-1. **Configure API Keys**:
+1. **Clone and install dependencies**:
    ```bash
-   # Add to your .env file
-   ANTHROPIC_API_KEY=your_anthropic_api_key_here
-   OPENAI_API_KEY=your_openai_api_key_here
+   npm run install-all
    ```
 
-2. **Install Dependencies**:
+2. **Configure environment**:
    ```bash
-   # The openai package is already included in requirements.txt
-   pip install -r backend/requirements.txt
+   cp .env.example .env
+   # Edit .env with your API keys and database credentials
    ```
 
-3. **Run Setup Script** (optional):
+3. **Set up database**:
    ```bash
-   python benchmark/setup_benchmark.py
+   # Create PostgreSQL database
+   createdb rmatss_db
+   
+   # Run migrations
+   npm run db:migrate
+   
+   # Seed sample data (optional)
+   npm run db:seed
    ```
 
-### Usage
+4. **Start ChromaDB (optional)**:
+   ```bash
+   docker run -p 8000:8000 chromadb/chroma
+   ```
 
-1. **Access the Benchmark Page**: Navigate to `/benchmark` in your application
-2. **Select a Profile**: Choose a completed company profile from the list
-3. **Generate Analysis**: Click "Générer l'Analyse" to run both models
-4. **Compare Results**: View side-by-side comparison of:
-   - SWOT Analysis (Strengths, Weaknesses, Opportunities, Threats)
-   - Strategic Recommendations
-   - Detailed Financial Analysis
+5. **Run the application**:
+   ```bash
+   npm run dev
+   ```
 
-### API Endpoints
+The backend runs on `http://localhost:5000` and the frontend on `http://localhost:3000`.
 
-- `GET /api/benchmark/profiles` - Get all completed profiles
-- `POST /api/benchmark/profiles/{id}/analyze` - Generate benchmark analysis
-- `GET /api/benchmark/services` - Get available LLM services
-- `GET /api/benchmark/profiles/{id}` - Get profile details
+## API Endpoints
 
-### Configuration Options
+### Authentication
+- `POST /api/auth/login` - User login
+- `POST /api/auth/register` - User registration
+- `GET /api/auth/me` - Get current user
 
-You can customize the benchmark behavior by setting these environment variables:
+### Students
+- `POST /api/tutor/ask` - Ask AI tutor a question
+- `GET /api/student/sessions` - Get tutoring session history
+- `POST /api/student/feedback` - Submit session feedback
+- `POST /api/attendance/checkin` - Clock in
+- `POST /api/attendance/checkout` - Clock out
+- `GET /api/student/progress` - Get progress metrics
 
+### Teachers
+- `POST /api/content/upload` - Upload course materials
+- `GET /api/teacher/students` - Get student list with analytics
+- `GET /api/teacher/sessions/:studentId` - View student-AI transcripts
+- `POST /api/teacher/feedback/:sessionId` - Evaluate AI pedagogy
+- `GET /api/teacher/analytics` - Class-wide analytics
+
+### Parents
+- `GET /api/parent/child/:studentId` - Get child's overview
+- `GET /api/parent/attendance/:studentId` - Get attendance logs
+- `GET /api/parent/alerts/:studentId` - Get anomaly alerts
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Frontend (React)                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   Student    │  │   Teacher    │  │    Parent    │      │
+│  │  Dashboard   │  │  Dashboard   │  │  Dashboard   │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+└─────────────────────────────────────────────────────────────┘
+                            ↕ HTTPS
+┌─────────────────────────────────────────────────────────────┐
+│                  Backend (Node.js/Express)                   │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │  Math Tutor  │  │ Physics Tutor│  │ Orientation  │      │
+│  │    Agent     │  │    Agent     │  │    Agent     │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│  ┌──────────────┐  ┌──────────────────────────────────┐    │
+│  │ Geofencing   │  │  Pedagogical Flow Shared Memory  │    │
+│  │    Agent     │  │         (PFSM)                   │    │
+│  └──────────────┘  └──────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+                    ↕                        ↕
+        ┌───────────────────┐    ┌──────────────────┐
+        │  Claude API       │    │   PostgreSQL     │
+        │  (Anthropic)      │    │   + ChromaDB     │
+        └───────────────────┘    └──────────────────┘
+```
+
+## Reinforcement Learning
+
+RMATSS implements a multi-component reward system:
+
+- **Rs (Student-Level)**: Learning success, mastery improvement, student satisfaction
+- **Rt (Tutor-Level)**: Pedagogical quality, scaffolding effectiveness, hint optimality
+- **Rg (General)**: Efficiency, engagement, solution quality
+
+**Total Reward**: Re = λs·Rs + λt·Rt + λg·Rg
+
+All interactions are logged episodically for offline RL training and continuous improvement.
+
+## Development
+
+### Project Structure
+```
+RMATSS/
+├── server/
+│   ├── index.js                 # Express server entry
+│   ├── config/                  # Configuration files
+│   ├── database/                # Models, migrations, seeds
+│   ├── routes/                  # API route handlers
+│   ├── controllers/             # Business logic
+│   ├── agents/                  # AI agent implementations
+│   ├── services/                # External services (Claude, RAG)
+│   └── middleware/              # Auth, validation, etc.
+├── client/
+│   ├── public/
+│   └── src/
+│       ├── components/          # React components
+│       ├── pages/               # Dashboard pages
+│       ├── services/            # API client
+│       ├── context/             # React context
+│       └── theme/               # App theme
+└── package.json
+```
+
+### Adding New Subjects
+To add a new subject tutor (e.g., Chemistry):
+
+1. Add subject to `server/agents/TutorAgent.js`
+2. Create subject-specific prompts
+3. Upload course materials via Teacher Dashboard
+4. The RAG system will automatically integrate new content
+
+## Deployment
+
+### Production Considerations
+- Use environment variables for all secrets
+- Enable HTTPS with SSL certificates
+- Set up PostgreSQL with connection pooling
+- Configure rate limiting on AI endpoints
+- Use Docker for consistent deployment
+- Set up monitoring and logging (Winston configured)
+
+### Docker Deployment (Future)
 ```bash
-# Model configurations
-ANTHROPIC_MODEL=claude-sonnet-4-5-20250929
-OPENAI_MODEL=gpt-4o
-
-# Analysis settings
-BENCHMARK_MAX_TOKENS=4000
-BENCHMARK_TEMPERATURE=0.1
-BENCHMARK_TIMEOUT=60
+docker-compose up -d
 ```
 
-## 🔄 Processing Workflow
+## License
 
-The application uses a sophisticated multi-threaded processing pipeline to generate comprehensive company profiles:
+MIT License - See LICENSE file for details
 
-### 1. **News Retrieval** (Parallel)
-- Searches Leconomiste and Tavily for company-related news
-- Uses AI to filter and analyze relevant articles
-- Provides sector monitoring and market intelligence
+## Support
 
-### 2. **Web Exploring** (Sequential after News)
-- Extracts company data from official websites
-- Integrates with Bizafrix and Charika business directories
-- Gathers company overview, sectors, markets, and key people
-- Uses Playwright for dynamic content scraping
-
-### 3. **Document Processing** (Sequential after Web Exploring)
-- Processes uploaded PDF documents with Claude AI OCR
-- Extracts financial KPIs and metadata
-- Computes financial ratios and metrics
-- Generates comprehensive financial analysis
-
-### 4. **Report Generation** (Final Step)
-- Combines all collected data into structured analysis
-- Generates SWOT analysis, recommendations, and conclusions
-- Creates HTML and PDF reports with professional templates
-- Automatically cleans up uploaded files to optimize storage
-
-### 5. **File Management**
-- **Automatic Cleanup**: PDFs and markdown files are deleted after processing
-- **Data Preservation**: All important JSON data is stored in the database
-- **Storage Optimization**: Reduces server storage requirements by ~90%
-
-## 📖 API Documentation
-
-### Authentication Endpoints
-
-#### Login
-```http
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "email": "admin@finsightai.com",
-  "password": "admin123"
-}
-```
-
-#### Register
-```http
-POST /api/auth/register
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "password123",
-  "first_name": "John",
-  "last_name": "Doe",
-  "role": "analyst"
-}
-```
-
-### Company Profiles Endpoints
-
-#### Get Profiles
-```http
-GET /api/profiles?page=1&per_page=10&search=company
-Authorization: Bearer <jwt-token>
-```
-
-#### Create Profile
-```http
-POST /api/profiles
-Authorization: Bearer <jwt-token>
-Content-Type: application/json
-
-{
-  "company_name": "Example Corp"
-}
-```
-
-#### Upload Documents
-```http
-POST /api/profiles/{profile_id}/upload
-Authorization: Bearer <jwt-token>
-Content-Type: multipart/form-data
-
-files: [file1.pdf, file2.pdf, file3.pdf]
-```
-
-#### Smart Upload (Enhanced)
-```http
-POST /api/profiles/{profile_id}/smart-upload
-Authorization: Bearer <jwt-token>
-Content-Type: multipart/form-data
-
-files: [file1.pdf, file2.pdf, file3.pdf]
-```
-
-#### View Report
-```http
-GET /api/profiles/{profile_id}/report
-Authorization: Bearer <jwt-token>
-```
-
-#### Download PDF Report
-```http
-GET /api/profiles/{profile_id}/pdf
-Authorization: Bearer <jwt-token>
-```
-
-#### Delete Profile
-```http
-DELETE /api/profiles/{profile_id}
-Authorization: Bearer <jwt-token>
-```
-
-#### Reprocess Profile
-```http
-POST /api/profiles/{profile_id}/reprocess
-Authorization: Bearer <jwt-token>
-```
-
-#### Verify Profile
-```http
-POST /api/profiles/verify
-Authorization: Bearer <jwt-token>
-Content-Type: application/json
-
-{
-  "company_name": "Example Corp",
-  "fiscal_year": "2023"
-}
-```
-
-## 📊 Report Generation System
-
-The application features a comprehensive report generation system that creates professional financial analysis reports:
-
-### **HTML Report Template**
-- **Dynamic Data Population**: Automatically fills financial data, KPIs, and company information
-- **Professional Styling**: Clean, modern design with responsive layout
-- **Interactive Elements**: JavaScript-powered data visualization and formatting
-- **Multi-language Support**: French language interface with proper formatting
-
-### **PDF Export Capability**
-- **One-click PDF Generation**: Convert HTML reports to PDF format
-- **Print-optimized Layout**: Professional formatting for physical distribution
-- **Embedded Assets**: Includes all CSS and JavaScript inline for portability
-- **High-quality Output**: Vector-based rendering for crisp text and graphics
-
-### **Report Content Structure**
-- **Executive Summary**: Company overview and key findings
-- **Financial Analysis**: KPIs, ratios, and financial health indicators
-- **SWOT Analysis**: AI-generated strengths, weaknesses, opportunities, threats
-- **Strategic Recommendations**: Actionable insights and next steps
-- **Market Intelligence**: News analysis and sector monitoring
-- **Company Profile**: Business sectors, markets, and key personnel
-
-### **Data Integration**
-- **Multi-source Aggregation**: Combines financial documents, web data, and news
-- **Real-time Processing**: Updates reports as new data becomes available
-- **Template Customization**: Flexible HTML template system for easy modifications
-- **Error Handling**: Graceful fallbacks for missing or incomplete data
-
-## 🎨 UI/UX Features
-
-### Design System
-- **Primary Color:** Blue (`#0ea5e9`)
-- **Secondary Color:** Purple (`#d946ef`)
-- **Typography:** Inter font family
-- **Animations:** Smooth transitions and micro-interactions
-- **Layout:** Responsive grid system with Flexbox
-
-### Key User Flows
-1. **Authentication:** Animated login with form validation
-2. **Dashboard:** Overview with statistics and quick actions
-3. **Profile Creation:** Enhanced wizard with fiscal year selection and email preferences
-4. **File Upload:** Drag-and-drop with real-time validation and smart processing
-5. **Profile Management:** Sortable table with search, pagination, and status tracking
-6. **Report Viewing:** Interactive HTML reports with financial data visualization
-7. **PDF Export:** One-click PDF generation for professional distribution
-8. **Profile Verification:** Smart duplicate detection and validation before creation
-
-## 🗂️ File Management & Storage Optimization
-
-The application implements an intelligent file management system to optimize server storage while preserving all critical data:
-
-### **Automatic File Cleanup**
-- **Post-Processing Cleanup**: PDFs and markdown files are automatically deleted after successful processing
-- **Data Preservation**: All important JSON data is permanently stored in the database
-- **Storage Reduction**: Achieves ~90% reduction in server storage requirements
-- **Selective Cleanup**: Only removes files after successful data extraction and storage
-
-### **Cleanup Process**
-1. **Document Processing**: PDFs are processed and data extracted
-2. **Data Storage**: All financial data, KPIs, and metadata saved to database
-3. **File Verification**: Confirms successful data storage before cleanup
-4. **Automatic Deletion**: Removes original PDFs and generated markdown files
-5. **Database Retention**: Preserves all structured data for future access
-
-### **Manual Cleanup Tools**
-- **One-time Cleanup Script**: `cleanup_existing_files.py` for existing uploads
-- **Profile Deletion**: Automatically cleans up files when profiles are deleted
-- **Storage Monitoring**: Built-in logging for cleanup operations
-
-### **Benefits**
-- **Cost Optimization**: Reduces cloud storage costs significantly
-- **Performance**: Faster database queries with less file I/O
-- **Reliability**: Data is safely stored in the database, not dependent on file system
-- **Scalability**: System can handle more profiles without storage concerns
-
-## 🔒 Security Features
-
-- **JWT Authentication** with configurable expiration
-- **Password Hashing** using Werkzeug's secure methods
-- **File Validation** for type, size, and quantity limits
-- **CORS Protection** with configurable origins
-- **SQL Injection Prevention** through SQLAlchemy ORM
-- **XSS Protection** through React's built-in sanitization
-
-## 🚀 Deployment
-
-### Production with Traefik (HTTPS at a domain)
-
-1. Create a Docker network for the reverse proxy (once per host):
-   ```bash
-   docker network create proxy
-   ```
-
-2. Create a `.env` file at the project root with production secrets:
-   ```env
-   TRAEFIK_ACME_EMAIL=you@example.com
-   TRAEFIK_DASHBOARD_HOST=traefik.yourdomain.com
-   POSTGRES_PASSWORD=change-this-strong-password
-   JWT_SECRET_KEY=change-this-strong-secret
-   # Generate with: docker run --rm httpd:2.4-alpine htpasswd -nbB admin 'StrongPass' | sed -e s/\$/\$\$/g
-   TRAEFIK_DASHBOARD_USERS=admin:$2y$05$examplehash...
-   ```
-
-3. Deploy:
-   ```bash
-   docker compose pull --ignore-buildable | cat
-   docker compose up -d --build
-   ```
-
-Traefik will request and renew Let’s Encrypt certificates automatically. The frontend is served by Nginx, and the backend runs with Gunicorn. The database is not exposed publicly.
-
-## 📊 Database Schema
-
-### Users Table
-- `id` (UUID, Primary Key)
-- `email` (Unique, Not Null)
-- `password_hash` (Not Null)
-- `first_name`, `last_name`
-- `role` (analyst, admin)
-- `is_active` (Boolean)
-- `created_at`, `updated_at`
-
-### Company Profiles Table
-- `id` (UUID, Primary Key)
-- `company_name` (Not Null)
-- `fiscal_years` (String) - Fiscal year for analysis (e.g., "2023", "2022-2023")
-- `profile_data` (JSONB) - Comprehensive profile data including:
-  - `extracted_kpis` - Financial KPIs from documents
-  - `computed_ratios` - Calculated financial ratios
-  - `web_data` - Company information from web sources
-  - `news_data` - News analysis and sector intelligence
-  - `swot_analysis` - AI-generated SWOT analysis
-  - `recommendation` - Strategic recommendations
-  - `detailed_analysis` - In-depth financial analysis
-  - `conclusion` - Executive summary and conclusions
-  - `email_report` - Email delivery preference
-  - `processing_log` - Real-time processing status updates
-- `status` (processing, completed, failed)
-- `created_by` (Foreign Key to Users)
-- `created_at`, `updated_at`
-
-### Liasse Documents Table
-- `id` (UUID, Primary Key)
-- `profile_id` (Foreign Key to Company Profiles)
-- `document_type`, `file_name`, `file_path`
-- `file_size`
-- `upload_status`, `ocr_status`
-- `extracted_data` (JSONB)
-- `created_at`
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## 📄 License
-
-This project is proprietary software developed by Digrow
-
-## 🆘 Support
-
-For technical support or questions:
-- Email: contact@digrowgroup.com
-- Documentation: [Internal Wiki]
-- Issues: [GitHub Issues]
+For issues, questions, or contributions, please contact the development team or open an issue on the project repository.
 
 ---
 
-**Company Profile Agent** - Transforming financial analysis with AI-powered document processing.
+**Built with ❤️ for innovative schools worldwide**
+

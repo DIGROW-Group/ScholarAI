@@ -1,0 +1,16 @@
+node_modules
+npm-debug.log
+.env
+.env.local
+.git
+.gitignore
+README.md
+*.md
+.vscode
+.idea
+client/node_modules
+client/build
+rmatss-platform
+uploads/*
+!uploads/.gitkeep
+

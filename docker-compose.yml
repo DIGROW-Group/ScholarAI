@@ -1,58 +1,73 @@
+version: '3.8'
+
 services:
-  db:
-    image: postgres:15
+  postgres:
+    image: postgres:14
+    container_name: rmatss-postgres
     environment:
-      POSTGRES_DB: company_profile_db
+      POSTGRES_DB: rmatss_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=trust"
-    ports:
-      - "5432:5432"
+      POSTGRES_PASSWORD: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - app-network
+    ports:
+      - "5433:5432"  # Using 5433 to avoid conflict with other project
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d company_profile_db"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
       timeout: 5s
       retries: 5
 
-  backend:
-    env_file:
-      - .env
-    build: ./backend
+  chroma:
+    image: chromadb/chroma
+    container_name: rmatss-chroma
     ports:
-      - "5000:5000"
-    environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/company_profile_db
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-change-in-production}
-      FLASK_ENV: ${FLASK_ENV:-development}
-    depends_on:
-      db:
-        condition: service_healthy
+      - "8000:8000"
     volumes:
-      - ./uploads:/app/uploads
-      - ./frontend:/app/frontend
-    networks:
-      - app-network
+      - chroma_data:/chroma/chroma
     restart: unless-stopped
 
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rmatss-backend
+    environment:
+      - NODE_ENV=production
+      - PORT=5001
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=rmatss_db
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - CHROMA_HOST=http://chroma:8000
+      - JWT_SECRET=${JWT_SECRET:-change_this_secret_in_production}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    ports:
+      - "5001:5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chroma:
+        condition: service_started
+    restart: unless-stopped
+    volumes:
+      - ./uploads:/app/server/uploads
+
   frontend:
-    build: ./frontend
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    container_name: rmatss-frontend
     ports:
       - "3000:3000"
-    environment:
-      REACT_APP_API_URL: http://localhost:5000
-    networks:
-      - app-network
     depends_on:
       - backend
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  chroma_data:
 
-networks:
-  app-network:
-    driver: bridge
