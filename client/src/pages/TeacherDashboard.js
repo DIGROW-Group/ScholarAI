@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getConfig } from '../config/appConfig';
 import {
   Box,
@@ -46,11 +46,22 @@ import {
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import TourEngine from '../components/OnboardingTour/TourEngine';
+import { tourConfigs } from '../components/OnboardingTour/tourConfigs';
 
 export default function TeacherDashboard() {
   const { user, logout } = useAuth();
   const config = getConfig();
   const [tabValue, setTabValue] = useState(0);
+  const [startTour, setStartTour] = useState(false);
+
+  const tourRefs = {
+    studentsTable: useRef(null),
+    aiTutorsTab: useRef(null),
+    contentLibrary: useRef(null),
+    uploadButton: useRef(null),
+    analyticsTab: useRef(null),
+  };
   
   // State
   const [students, setStudents] = useState([]);
@@ -102,6 +113,27 @@ export default function TeacherDashboard() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (!user || user.onboardingCompleted) return;
+    const timer = setTimeout(() => setStartTour(true), 800);
+    return () => clearTimeout(timer);
+  }, [user?.id, user?.onboardingCompleted]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const refKey = e?.detail?.refKey;
+      if (!refKey) return;
+
+      if (refKey === 'studentsTable') setTabValue(0);
+      if (refKey === 'aiTutorsTab') setTabValue(1);
+      if (refKey === 'contentLibrary' || refKey === 'uploadButton') setTabValue(2);
+      if (refKey === 'analyticsTab') setTabValue(3);
+    };
+
+    window.addEventListener('scholarai:onboarding-tour-step', handler);
+    return () => window.removeEventListener('scholarai:onboarding-tour-step', handler);
+  }, []);
+
   const loadData = async () => {
     try {
       const [studentsRes, documentsRes, analyticsRes] = await Promise.all([
@@ -134,6 +166,7 @@ export default function TeacherDashboard() {
 
       setUploadDialog(false);
       setUploadForm({ subject: 'math', title: '', description: '', chapter: '', guidelines: '', file: null });
+      
       loadData();
       alert('Document uploaded successfully!');
     } catch (error) {
@@ -221,9 +254,9 @@ export default function TeacherDashboard() {
               }}
             >
               <Tab label="Students" icon={<People />} iconPosition="start" />
-              <Tab label="My AI Tutors" icon={<Star />} iconPosition="start" />
-              <Tab label="Content Library" icon={<Assignment />} iconPosition="start" />
-              <Tab label="Analytics" icon={<Analytics />} iconPosition="start" />
+              <Tab ref={tourRefs.aiTutorsTab} label="My AI Tutors" icon={<Star />} iconPosition="start" />
+              <Tab ref={tourRefs.contentLibrary} label="Content Library" icon={<Assignment />} iconPosition="start" />
+              <Tab ref={tourRefs.analyticsTab} label="Analytics" icon={<Analytics />} iconPosition="start" />
             </Tabs>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -238,12 +271,11 @@ export default function TeacherDashboard() {
       </AppBar>
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
-
         {/* Tab 0: Students */}
         {tabValue === 0 && (
           <Grid container spacing={3}>
             <Grid item xs={12}>
-              <Paper sx={{ p: 3 }}>
+              <Paper ref={tourRefs.studentsTable} sx={{ p: 3 }}>
                 <Typography variant="h6" gutterBottom>
                   Student Overview
                 </Typography>
@@ -393,6 +425,7 @@ export default function TeacherDashboard() {
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                 <Typography variant="h6">Course Documents</Typography>
                 <Button
+                  ref={tourRefs.uploadButton}
                   variant="contained"
                   startIcon={<Upload />}
                   onClick={() => setUploadDialog(true)}
@@ -814,6 +847,8 @@ export default function TeacherDashboard() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {startTour && <TourEngine steps={tourConfigs.teacher} refs={tourRefs} />}
     </Box>
   );
 }

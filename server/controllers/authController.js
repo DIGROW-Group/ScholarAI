@@ -43,7 +43,8 @@ exports.register = async (req, res) => {
         lastName: user.lastName,
         role: user.role,
         grade: user.grade,
-        subjects: user.subjects || []
+        subjects: user.subjects || [],
+        onboardingCompleted: user.onboardingCompleted
       },
       token
     });
@@ -88,7 +89,8 @@ exports.login = async (req, res) => {
         lastName: user.lastName,
         role: user.role,
         grade: user.grade,
-        subjects: user.subjects || []
+        subjects: user.subjects || [],
+        onboardingCompleted: user.onboardingCompleted
       },
       token
     });
@@ -109,11 +111,28 @@ exports.getMe = async (req, res) => {
         role: req.user.role,
         grade: req.user.grade,
         subjects: req.user.subjects || [],
-        avatar: req.user.avatar
+        avatar: req.user.avatar,
+        onboardingCompleted: req.user.onboardingCompleted
       }
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch user' });
+  }
+};
+
+exports.completeOnboarding = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await user.update({ onboardingCompleted: true });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error completing onboarding:', error);
+    res.status(500).json({ error: 'Failed to complete onboarding' });
   }
 };
 

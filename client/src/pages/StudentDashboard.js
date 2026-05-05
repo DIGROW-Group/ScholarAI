@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getConfig } from '../config/appConfig';
 import {
   Box,
@@ -41,11 +41,23 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import TourEngine from '../components/OnboardingTour/TourEngine';
+import { tourConfigs } from '../components/OnboardingTour/tourConfigs';
 
 export default function StudentDashboard() {
   const { user, logout } = useAuth();
   const config = getConfig();
   const [tabValue, setTabValue] = useState(0);
+  const [startTour, setStartTour] = useState(false);
+
+  const tourRefs = {
+    appBarTabs: useRef(null),
+    attendancePanel: useRef(null),
+    alertBanners: useRef(null),
+    aiTutorChat: useRef(null),
+    subjectChips: useRef(null),
+    masteryBars: useRef(null),
+  };
   
   // Tutor state
   const [subject, setSubject] = useState('math');
@@ -78,6 +90,12 @@ export default function StudentDashboard() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!user || user.onboardingCompleted) return;
+    const timer = setTimeout(() => setStartTour(true), 800);
+    return () => clearTimeout(timer);
+  }, [user?.id, user?.onboardingCompleted]);
 
   const loadData = async () => {
     try {
@@ -195,6 +213,7 @@ export default function StudentDashboard() {
             </Box>
           <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
             <Tabs 
+              ref={tourRefs.appBarTabs}
               value={tabValue} 
               onChange={(e, v) => setTabValue(v)} 
               sx={{ 
@@ -231,7 +250,7 @@ export default function StudentDashboard() {
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
         {/* Attendance Section */}
-        <Paper sx={{ mb: 3, p: 2 }}>
+        <Paper ref={tourRefs.attendancePanel} sx={{ mb: 3, p: 2 }}>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} md={6}>
               <Typography variant="h6" gutterBottom>
@@ -266,9 +285,9 @@ export default function StudentDashboard() {
         </Paper>
 
         {/* Alerts */}
-        {alerts.length > 0 && (
-          <Box sx={{ mb: 3 }}>
-            {alerts.slice(0, 3).map((alert) => (
+        <Box ref={tourRefs.alertBanners} sx={{ mb: 3 }}>
+          {alerts.length > 0 ? (
+            alerts.slice(0, 3).map((alert) => (
               <Alert
                 key={alert.id}
                 severity={alert.severity}
@@ -276,21 +295,25 @@ export default function StudentDashboard() {
               >
                 <strong>{alert.title}</strong>: {alert.message}
               </Alert>
-            ))}
-          </Box>
-        )}
+            ))
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              No alerts right now.
+            </Typography>
+          )}
+        </Box>
 
         {/* Tab 0: AI Tutor */}
         {tabValue === 0 && (
           <Grid container spacing={3}>
             <Grid item xs={12} md={8}>
-              <Paper sx={{ p: 3, minHeight: 500 }}>
+              <Paper ref={tourRefs.aiTutorChat} sx={{ p: 3, minHeight: 500 }}>
                 <Typography variant="h6" gutterBottom>AI Tutor Q&A</Typography>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
                   Select a subject and ask your question
                 </Typography>
                 
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, my: 2 }}>
+                <Box ref={tourRefs.subjectChips} sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, my: 2 }}>
                   {filteredSubjects.length === 0 && (
                     <Alert severity="warning" sx={{ width: '100%' }}>
                       No subjects available. Please contact your teacher or admin to be assigned to a classroom.
@@ -401,12 +424,12 @@ export default function StudentDashboard() {
                 </List>
               </Paper>
 
-              {progress && (
-                <Paper sx={{ p: 2 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Mastery Levels
-                  </Typography>
-                  {Object.entries(progress.masteryLevels).map(([subject, level]) => (
+              <Paper ref={tourRefs.masteryBars} sx={{ p: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Mastery Levels
+                </Typography>
+                {progress ? (
+                  Object.entries(progress.masteryLevels).map(([subject, level]) => (
                     <Box key={subject} sx={{ mb: 2 }}>
                       <Typography variant="body2">{subject.toUpperCase()}</Typography>
                       <LinearProgress
@@ -416,9 +439,13 @@ export default function StudentDashboard() {
                       />
                       <Typography variant="caption">{(level * 100).toFixed(0)}%</Typography>
                     </Box>
-                  ))}
-                </Paper>
-              )}
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    Loading mastery levels...
+                  </Typography>
+                )}
+              </Paper>
             </Grid>
           </Grid>
         )}
@@ -569,6 +596,8 @@ export default function StudentDashboard() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {startTour && <TourEngine steps={tourConfigs.student} refs={tourRefs} />}
     </Box>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getConfig } from '../config/appConfig';
 import {
   Box,
@@ -43,6 +43,8 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import TourEngine from '../components/OnboardingTour/TourEngine';
+import { tourConfigs } from '../components/OnboardingTour/tourConfigs';
 
 const COLORS = ['#FF6B35', '#424242', '#757575', '#FF8C5A'];
 
@@ -56,6 +58,17 @@ export default function ParentDashboard() {
   const [alerts, setAlerts] = useState([]);
   const [linkDialog, setLinkDialog] = useState(false);
   const [studentEmail, setStudentEmail] = useState('');
+  const [startTour, setStartTour] = useState(false);
+  const [resolvedTourSteps, setResolvedTourSteps] = useState([]);
+
+  const tourRefs = {
+    childSelector: useRef(null),
+    linkChildButton: useRef(null),
+    summaryCards: useRef(null),
+    masteryBars: useRef(null),
+    attendancePie: useRef(null),
+    alertsPanel: useRef(null),
+  };
 
   useEffect(() => {
     loadChildren();
@@ -66,6 +79,25 @@ export default function ParentDashboard() {
       loadChildData(selectedChild.id);
     }
   }, [selectedChild]);
+
+  useEffect(() => {
+    if (!user || user.onboardingCompleted) return;
+    const timer = setTimeout(() => setStartTour(true), 800);
+    return () => clearTimeout(timer);
+  }, [user?.id, user?.onboardingCompleted]);
+
+  useEffect(() => {
+    if (!startTour) return;
+
+    if (children.length === 0) {
+      setResolvedTourSteps(
+        tourConfigs.parent.filter((step) => ['childSelector', 'linkChildButton'].includes(step.refKey))
+      );
+      return;
+    }
+
+    setResolvedTourSteps(tourConfigs.parent);
+  }, [startTour, children.length]);
 
   const loadChildren = async () => {
     try {
@@ -100,6 +132,7 @@ export default function ParentDashboard() {
       await api.post('/parent/children/link', { studentEmail });
       setLinkDialog(false);
       setStudentEmail('');
+      
       loadChildren();
       alert('Child linked successfully!');
     } catch (error) {
@@ -159,7 +192,7 @@ export default function ParentDashboard() {
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
         {/* Child Selector */}
-        <Paper sx={{ p: 2, mb: 3 }}>
+        <Paper ref={tourRefs.childSelector} sx={{ p: 2, mb: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box>
               <Typography variant="h6" gutterBottom>
@@ -180,6 +213,7 @@ export default function ParentDashboard() {
               variant="outlined"
               startIcon={<PersonAdd />}
               onClick={() => setLinkDialog(true)}
+              ref={tourRefs.linkChildButton}
             >
               Link Child
             </Button>
@@ -189,9 +223,9 @@ export default function ParentDashboard() {
         {selectedChild && childOverview ? (
           <>
             {/* Alerts Section */}
-            {alerts.filter(a => a.severity === 'critical' || a.severity === 'warning').slice(0, 3).length > 0 && (
-              <Box sx={{ mb: 3 }}>
-                {alerts
+            <Box ref={tourRefs.alertsPanel} sx={{ mb: 3 }}>
+              {alerts.filter(a => a.severity === 'critical' || a.severity === 'warning').slice(0, 3).length > 0 ? (
+                alerts
                   .filter(a => a.severity === 'critical' || a.severity === 'warning')
                   .slice(0, 3)
                   .map((alert) => (
@@ -203,12 +237,16 @@ export default function ParentDashboard() {
                     >
                       <strong>{alert.title}</strong>: {alert.message}
                     </Alert>
-                  ))}
-              </Box>
-            )}
+                  ))
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No alerts right now.
+                </Typography>
+              )}
+            </Box>
 
             {/* Summary Cards */}
-            <Grid container spacing={3} sx={{ mb: 3 }}>
+            <Grid ref={tourRefs.summaryCards} container spacing={3} sx={{ mb: 3 }}>
               <Grid item xs={12} md={3}>
                 <Card>
                   <CardContent>
@@ -281,7 +319,7 @@ export default function ParentDashboard() {
             {/* Performance Overview */}
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
-                <Paper sx={{ p: 3 }}>
+                <Paper ref={tourRefs.masteryBars} sx={{ p: 3 }}>
                   <Typography variant="h6" gutterBottom>
                     <TrendingUp sx={{ mr: 1, verticalAlign: 'middle' }} />
                     Subject Mastery
@@ -342,7 +380,7 @@ export default function ParentDashboard() {
               </Grid>
 
               <Grid item xs={12} md={6}>
-                <Paper sx={{ p: 3, mb: 3 }}>
+                <Paper ref={tourRefs.attendancePie} sx={{ p: 3, mb: 3 }}>
                   <Typography variant="h6" gutterBottom>
                     <CalendarToday sx={{ mr: 1, verticalAlign: 'middle' }} />
                     Attendance Overview
@@ -531,6 +569,8 @@ export default function ParentDashboard() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {startTour && <TourEngine steps={resolvedTourSteps} refs={tourRefs} />}
     </Box>
   );
 }

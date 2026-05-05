@@ -75,8 +75,22 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const completeOnboarding = async () => {
+    try {
+      await api.post('/auth/onboarding-complete');
+      setUser((prevUser) => (prevUser ? { ...prevUser, onboardingCompleted: true } : prevUser));
+      return { success: true };
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to complete onboarding'
+      };
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, completeOnboarding }}>
       {children}
     </AuthContext.Provider>
   );

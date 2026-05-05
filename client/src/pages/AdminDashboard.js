@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getConfig } from '../config/appConfig';
 import {
   Box,
@@ -62,6 +62,8 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import TourEngine from '../components/OnboardingTour/TourEngine';
+import { tourConfigs } from '../components/OnboardingTour/tourConfigs';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -71,6 +73,15 @@ export default function AdminDashboard() {
   const [editDialog, setEditDialog] = useState(false);
   const [selectedSubjects, setSelectedSubjects] = useState([]);
   const [successMessage, setSuccessMessage] = useState('');
+  const [startTour, setStartTour] = useState(false);
+
+  const tourRefs = {
+    kpiCards: useRef(null),
+    classroomsGrid: useRef(null),
+    teachersPanel: useRef(null),
+    counselorList: useRef(null),
+    parentsPaymentsTable: useRef(null),
+  };
   
   // Classroom state
   const [classrooms, setClassrooms] = useState([]);
@@ -107,6 +118,28 @@ export default function AdminDashboard() {
     loadDashboardData();
     loadTeachers();
     loadClassrooms();
+  }, []);
+
+  useEffect(() => {
+    if (!user || user.onboardingCompleted) return;
+    const timer = setTimeout(() => setStartTour(true), 800);
+    return () => clearTimeout(timer);
+  }, [user?.id, user?.onboardingCompleted]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const refKey = e?.detail?.refKey;
+      if (!refKey) return;
+
+      if (refKey === 'kpiCards' || refKey === 'counselorList' || refKey === 'parentsPaymentsTable') {
+        setTabValue(0);
+      }
+      if (refKey === 'classroomsGrid') setTabValue(1);
+      if (refKey === 'teachersPanel') setTabValue(2);
+    };
+
+    window.addEventListener('scholarai:onboarding-tour-step', handler);
+    return () => window.removeEventListener('scholarai:onboarding-tour-step', handler);
   }, []);
 
   const loadDashboardData = async () => {
@@ -149,6 +182,7 @@ export default function AdminDashboard() {
       setSuccessMessage('Classroom created successfully!');
       setCreateClassroomDialog(false);
       setClassroomForm({ name: '', grade: '1ere Bac', teacherId: '', academicYear: '2024-2025', description: '' });
+      
       loadClassrooms();
       setTimeout(() => setSuccessMessage(''), 5000);
     } catch (error) {
@@ -303,7 +337,7 @@ export default function AdminDashboard() {
             </Paper>
 
             {/* Statistics Cards */}
-            <Grid container spacing={3} sx={{ mb: 3 }}>
+            <Grid ref={tourRefs.kpiCards} container spacing={3} sx={{ mb: 3 }}>
               <Grid item xs={12} sm={6} md={3}>
                 <Card sx={{ background: 'linear-gradient(135deg, #ea9b20 0%, #FFB84D 100%)', color: 'white', height: '100%' }}>
                   <CardContent>
@@ -364,7 +398,7 @@ export default function AdminDashboard() {
             <Grid container spacing={3}>
               {/* Counselors Section */}
               <Grid item xs={12} md={6}>
-                <Paper sx={{ p: 3, height: '100%' }}>
+                <Paper ref={tourRefs.counselorList} sx={{ p: 3, height: '100%' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                     <Psychology sx={{ fontSize: 32, color: 'primary.main', mr: 1.5 }} />
                     <Typography variant="h5" fontWeight="bold">Counselors</Typography>
@@ -438,7 +472,7 @@ export default function AdminDashboard() {
 
               {/* Parents with Payment Status */}
               <Grid item xs={12}>
-                <Paper sx={{ p: 3 }}>
+                <Paper ref={tourRefs.parentsPaymentsTable} sx={{ p: 3 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                     <AccountBalance sx={{ fontSize: 32, color: 'primary.main', mr: 1.5 }} />
                     <Box sx={{ flex: 1 }}>
@@ -538,13 +572,14 @@ export default function AdminDashboard() {
               Create classrooms, assign teachers and students. Students automatically get access to their classroom teacher's AI tutors.
             </Typography>
 
-            {classrooms.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
-                No classrooms created yet. Click "Create Classroom" to get started.
-              </Typography>
-            ) : (
-              <Grid container spacing={3} sx={{ mt: 1 }}>
-                {classrooms.map((classroom) => {
+            <Box ref={tourRefs.classroomsGrid}>
+              {classrooms.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+                  No classrooms created yet. Click "Create Classroom" to get started.
+                </Typography>
+              ) : (
+                <Grid container spacing={3} sx={{ mt: 1 }}>
+                  {classrooms.map((classroom) => {
                   // Determine card color based on grade (orange/yellow variants)
                   const getCardColor = (grade) => {
                     if (grade.includes('1ere')) return '#C77A0A'; // Dark orange
@@ -647,15 +682,16 @@ export default function AdminDashboard() {
                       </Card>
                     </Grid>
                   );
-                })}
-              </Grid>
-            )}
+                  })}
+                </Grid>
+              )}
+            </Box>
           </Paper>
         )}
 
         {/* Tab 2: Teacher Management */}
         {tabValue === 2 && (
-          <Paper sx={{ p: 3 }}>
+          <Paper ref={tourRefs.teachersPanel} sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
               <Box>
                 <Typography variant="h4" fontWeight="bold">
@@ -978,6 +1014,8 @@ export default function AdminDashboard() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {startTour && <TourEngine steps={tourConfigs.admin} refs={tourRefs} />}
     </Box>
   );
 }

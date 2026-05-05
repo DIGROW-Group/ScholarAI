@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getConfig } from '../config/appConfig';
 import {
   Box,
@@ -50,11 +50,21 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import TourEngine from '../components/OnboardingTour/TourEngine';
+import { tourConfigs } from '../components/OnboardingTour/tourConfigs';
 
 export default function CounselorDashboard() {
   const { user, logout } = useAuth();
   const config = getConfig();
   const [tabValue, setTabValue] = useState(0);
+  const [startTour, setStartTour] = useState(false);
+
+  const tourRefs = {
+    allStudentsTable: useRef(null),
+    studentDetailsAction: useRef(null),
+    orientationAction: useRef(null),
+    classroomsTab: useRef(null),
+  };
   
   // State
   const [students, setStudents] = useState([]);
@@ -72,6 +82,28 @@ export default function CounselorDashboard() {
   useEffect(() => {
     loadStudents();
     loadClassrooms();
+  }, []);
+
+  useEffect(() => {
+    if (!user || user.onboardingCompleted) return;
+    if (students.length === 0) return;
+    const timer = setTimeout(() => setStartTour(true), 800);
+    return () => clearTimeout(timer);
+  }, [user?.id, user?.onboardingCompleted, students.length]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const refKey = e?.detail?.refKey;
+      if (!refKey) return;
+
+      if (refKey === 'classroomsTab') setTabValue(1);
+      if (refKey === 'allStudentsTable' || refKey === 'studentDetailsAction' || refKey === 'orientationAction') {
+        setTabValue(0);
+      }
+    };
+
+    window.addEventListener('scholarai:onboarding-tour-step', handler);
+    return () => window.removeEventListener('scholarai:onboarding-tour-step', handler);
   }, []);
 
   const loadStudents = async () => {
@@ -205,7 +237,7 @@ export default function CounselorDashboard() {
               }}
             >
               <Tab label="All Students" icon={<People />} />
-              <Tab label="Classrooms" icon={<Class />} />
+              <Tab ref={tourRefs.classroomsTab} label="Classrooms" icon={<Class />} />
             </Tabs>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -231,7 +263,7 @@ export default function CounselorDashboard() {
           </Paper>
 
           {tabValue === 0 && (
-            <Paper elevation={3} sx={{ p: 3 }}>
+            <Paper ref={tourRefs.allStudentsTable} elevation={3} sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                 <Typography variant="h5">All Students</Typography>
                 <Button variant="outlined" startIcon={<Refresh />} onClick={loadStudents}>
@@ -255,7 +287,7 @@ export default function CounselorDashboard() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {students.map((student) => (
+                      {students.map((student, index) => (
                         <TableRow key={student.id}>
                           <TableCell>{student.firstName} {student.lastName}</TableCell>
                           <TableCell>{student.email}</TableCell>
@@ -266,6 +298,7 @@ export default function CounselorDashboard() {
                               variant="outlined"
                               onClick={() => loadStudentDetails(student.id)}
                               sx={{ mr: 1 }}
+                              ref={index === 0 ? tourRefs.studentDetailsAction : null}
                             >
                               View Details
                             </Button>
@@ -275,6 +308,7 @@ export default function CounselorDashboard() {
                               color="primary"
                               startIcon={<Psychology />}
                               onClick={() => loadOrientationData(student.id)}
+                              ref={index === 0 ? tourRefs.orientationAction : null}
                             >
                               Orientation
                             </Button>
@@ -656,6 +690,8 @@ export default function CounselorDashboard() {
           <Button onClick={() => setOrientationDialog(false)}>Close</Button>
         </DialogActions>
       </Dialog>
+
+      {startTour && <TourEngine steps={tourConfigs.counselor} refs={tourRefs} />}
     </Box>
   );
 }
