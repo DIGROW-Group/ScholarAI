@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:14
+    image: postgres:15
     container_name: rmatss-postgres
     environment:
       POSTGRES_DB: rmatss_db
@@ -23,7 +23,7 @@ services:
     image: chromadb/chroma
     container_name: rmatss-chroma
     ports:
-      - "8000:8000"
+      - "8100:8000"
     volumes:
       - chroma_data:/chroma/chroma
     restart: unless-stopped
@@ -62,7 +62,7 @@ services:
       dockerfile: Dockerfile.client
     container_name: rmatss-frontend
     ports:
-      - "3000:3000"
+      - "3001:3000"
     depends_on:
       - backend
     restart: unless-stopped

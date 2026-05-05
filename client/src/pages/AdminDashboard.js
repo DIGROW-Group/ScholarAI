@@ -9,6 +9,7 @@ import {
   Toolbar,
   IconButton,
   Button,
+  Drawer,
   Table,
   TableBody,
   TableCell,
@@ -31,6 +32,8 @@ import {
   Tabs,
   List,
   ListItem,
+  ListItemButton,
+  ListItemIcon,
   ListItemText,
   Divider,
   Grid,
@@ -59,6 +62,7 @@ import {
   Science,
   Language,
   Computer,
+  Menu as MenuIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -86,6 +90,7 @@ export default function AdminDashboard() {
     description: ''
   });
   const [tabValue, setTabValue] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   
   // Dashboard state
   const [allUsers, setAllUsers] = useState([]);
@@ -101,6 +106,12 @@ export default function AdminDashboard() {
     { id: 'english', label: 'English', icon: Language },
     { id: 'french', label: 'French', icon: Language },
     { id: 'informatique', label: 'IT', icon: Computer },
+  ];
+
+  const adminTabs = [
+    { label: 'Dashboard', icon: <Dashboard /> },
+    { label: 'Classrooms', icon: <Class /> },
+    { label: 'Teachers', icon: <School /> },
   ];
 
   useEffect(() => {
@@ -228,6 +239,13 @@ export default function AdminDashboard() {
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <AppBar position="static" sx={{ bgcolor: '#757575' }}>
         <Toolbar>
+          <IconButton
+            color="inherit"
+            onClick={() => setDrawerOpen(true)}
+            sx={{ mr: 1, display: { xs: 'inline-flex', md: 'none' } }}
+          >
+            <MenuIcon />
+          </IconButton>
           <Box sx={{ p: 1, mr: 3 }}>
             <Box
               component="img"
@@ -246,6 +264,7 @@ export default function AdminDashboard() {
               value={tabValue} 
               onChange={(e, v) => setTabValue(v)} 
               sx={{ 
+                display: { xs: 'none', md: 'flex' },
                 '& .MuiTab-root': {
                   minHeight: 64,
                   textTransform: 'none',
@@ -261,9 +280,9 @@ export default function AdminDashboard() {
                 }
               }}
             >
-              <Tab label="Dashboard" icon={<Dashboard />} iconPosition="start" />
-              <Tab label="Classrooms" icon={<Class />} iconPosition="start" />
-              <Tab label="Teachers" icon={<School />} iconPosition="start" />
+              {adminTabs.map((tab) => (
+                <Tab key={tab.label} label={tab.label} icon={tab.icon} iconPosition="start" />
+              ))}
             </Tabs>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -276,6 +295,31 @@ export default function AdminDashboard() {
           </Box>
         </Toolbar>
       </AppBar>
+
+      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <Box sx={{ width: 260 }} role="presentation">
+          <Box sx={{ p: 2 }}>
+            <Typography variant="h6">Navigation</Typography>
+          </Box>
+          <Divider />
+          <List>
+            {adminTabs.map((tab, index) => (
+              <ListItem key={tab.label} disablePadding>
+                <ListItemButton
+                  selected={tabValue === index}
+                  onClick={() => {
+                    setTabValue(index);
+                    setDrawerOpen(false);
+                  }}
+                >
+                  <ListItemIcon>{tab.icon}</ListItemIcon>
+                  <ListItemText primary={tab.label} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+      </Drawer>
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
         {successMessage && (

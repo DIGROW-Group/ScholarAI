@@ -10,11 +10,14 @@ import {
   Toolbar,
   IconButton,
   Button,
+  Drawer,
   Card,
   CardContent,
   TextField,
   List,
   ListItem,
+  ListItemButton,
+  ListItemIcon,
   ListItemText,
   Chip,
   Divider,
@@ -38,6 +41,7 @@ import {
   Lightbulb,
   Login as LoginIcon,
   LogoutOutlined,
+  Menu as MenuIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -46,6 +50,7 @@ export default function StudentDashboard() {
   const { user, logout } = useAuth();
   const config = getConfig();
   const [tabValue, setTabValue] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   
   // Tutor state
   const [subject, setSubject] = useState('math');
@@ -74,6 +79,12 @@ export default function StudentDashboard() {
   const [attendance, setAttendance] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [availableSubjects, setAvailableSubjects] = useState([]);
+
+  const studentTabs = [
+    { label: 'AI Tutor', icon: <Lightbulb /> },
+    { label: 'My Progress', icon: <TrendingUp /> },
+    { label: 'Orientation', icon: <School /> },
+  ];
 
   useEffect(() => {
     loadData();
@@ -180,6 +191,13 @@ export default function StudentDashboard() {
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <AppBar position="static" sx={{ bgcolor: '#757575' }}>
         <Toolbar>
+            <IconButton
+              color="inherit"
+              onClick={() => setDrawerOpen(true)}
+              sx={{ mr: 1, display: { xs: 'inline-flex', md: 'none' } }}
+            >
+              <MenuIcon />
+            </IconButton>
             <Box sx={{ p: 1, mr: 3 }}>
               <Box
                 component="img"
@@ -198,6 +216,7 @@ export default function StudentDashboard() {
               value={tabValue} 
               onChange={(e, v) => setTabValue(v)} 
               sx={{ 
+                display: { xs: 'none', md: 'flex' },
                 '& .MuiTab-root': {
                   minHeight: 64,
                   textTransform: 'none',
@@ -213,9 +232,9 @@ export default function StudentDashboard() {
                 }
               }}
             >
-              <Tab label="AI Tutor" />
-              <Tab label="My Progress" />
-              <Tab label="Orientation" />
+              {studentTabs.map((tab) => (
+                <Tab key={tab.label} label={tab.label} />
+              ))}
             </Tabs>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -228,6 +247,30 @@ export default function StudentDashboard() {
           </Box>
         </Toolbar>
       </AppBar>
+
+      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <Box sx={{ width: 260 }} role="presentation">
+          <Box sx={{ p: 2 }}>
+            <Typography variant="h6">Navigation</Typography>
+          </Box>
+          <List>
+            {studentTabs.map((tab, index) => (
+              <ListItem key={tab.label} disablePadding>
+                <ListItemButton
+                  selected={tabValue === index}
+                  onClick={() => {
+                    setTabValue(index);
+                    setDrawerOpen(false);
+                  }}
+                >
+                  <ListItemIcon>{tab.icon}</ListItemIcon>
+                  <ListItemText primary={tab.label} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+      </Drawer>
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
         {/* Attendance Section */}

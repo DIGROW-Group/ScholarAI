@@ -96,11 +96,12 @@ export default function Login() {
           justifyContent: 'center',
           alignItems: 'center',
           bgcolor: 'background.default',
+          px: { xs: 2, sm: 4 },
+          py: { xs: 4, sm: 6 },
         }}
       >
         <Box
           sx={{
-            mx: 4,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -108,15 +109,15 @@ export default function Login() {
             width: '100%',
           }}
         >
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Box sx={{ p: 2, mb: 1 }}>
+          <Box sx={{ textAlign: 'center', mb: { xs: 3, sm: 4 } }}>
+            <Box sx={{ p: { xs: 1, sm: 2 }, mb: 1 }}>
               <Box
                 component="img"
                 src={logoUrl}
                 alt={`${config.name} Logo`}
                 key={`logo-${config.logoImage}-${logoUrl}`}
                 sx={{
-                  height: 108,
+                  height: { xs: 72, sm: 90, md: 108 },
                   width: 'auto',
                   objectFit: 'contain',
                 }}
@@ -135,10 +136,17 @@ export default function Login() {
                 }}
               />
             </Box>
-            <Typography variant="h3" component="h1" gutterBottom fontWeight="bold" color="primary.main">
+            <Typography
+              variant="h3"
+              component="h1"
+              gutterBottom
+              fontWeight="bold"
+              color="primary.main"
+              sx={{ fontSize: { xs: '1.75rem', sm: '2.25rem', md: '2.8rem' } }}
+            >
               {config.name}
             </Typography>
-            <Typography variant="h6" color="text.secondary" gutterBottom>
+            <Typography variant="h6" color="text.secondary" gutterBottom sx={{ fontSize: { xs: '1rem', sm: '1.1rem' } }}>
               {/* École Marocaine des Sciences de l'Ingénieur */}
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -152,7 +160,7 @@ export default function Login() {
             </Alert>
           )}
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: { xs: 0, sm: 1 }, width: '100%' }}>
             <TextField
               fullWidth
               label="Email"
@@ -177,7 +185,7 @@ export default function Login() {
               fullWidth
               variant="contained"
               size="large"
-              sx={{ mt: 3, mb: 2, py: 1.5 }}
+              sx={{ mt: { xs: 2, sm: 3 }, mb: 2, py: 1.5 }}
               disabled={loading}
             >
               {loading ? 'Logging in...' : 'Log In'}

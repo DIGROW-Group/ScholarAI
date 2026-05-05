@@ -9,6 +9,7 @@ import {
   Toolbar,
   IconButton,
   Button,
+  Drawer,
   Card,
   CardContent,
   Table,
@@ -28,6 +29,8 @@ import {
   Grid,
   List,
   ListItem,
+  ListItemButton,
+  ListItemIcon,
   ListItemText,
   Divider,
   CircularProgress,
@@ -47,6 +50,7 @@ import {
   Refresh,
   Timeline,
   Class,
+  Menu as MenuIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -55,6 +59,7 @@ export default function CounselorDashboard() {
   const { user, logout } = useAuth();
   const config = getConfig();
   const [tabValue, setTabValue] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   
   // State
   const [students, setStudents] = useState([]);
@@ -68,6 +73,11 @@ export default function CounselorDashboard() {
   // Dialogs
   const [studentDialog, setStudentDialog] = useState(false);
   const [orientationDialog, setOrientationDialog] = useState(false);
+
+  const counselorTabs = [
+    { label: 'All Students', icon: <People /> },
+    { label: 'Classrooms', icon: <Class /> },
+  ];
   
   useEffect(() => {
     loadStudents();
@@ -171,6 +181,13 @@ export default function CounselorDashboard() {
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1, bgcolor: '#757575' }}>
         <Toolbar>
+            <IconButton
+              color="inherit"
+              onClick={() => setDrawerOpen(true)}
+              sx={{ mr: 1, display: { xs: 'inline-flex', md: 'none' } }}
+            >
+              <MenuIcon />
+            </IconButton>
             <Box sx={{ p: 1, mr: 3 }}>
               <Box
                 component="img"
@@ -189,6 +206,7 @@ export default function CounselorDashboard() {
               value={tabValue} 
               onChange={(e, newValue) => setTabValue(newValue)} 
               sx={{ 
+                display: { xs: 'none', md: 'flex' },
                 '& .MuiTab-root': {
                   minHeight: 64,
                   textTransform: 'none',
@@ -204,8 +222,9 @@ export default function CounselorDashboard() {
                 }
               }}
             >
-              <Tab label="All Students" icon={<People />} />
-              <Tab label="Classrooms" icon={<Class />} />
+              {counselorTabs.map((tab) => (
+                <Tab key={tab.label} label={tab.label} icon={tab.icon} />
+              ))}
             </Tabs>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -218,6 +237,30 @@ export default function CounselorDashboard() {
           </Box>
         </Toolbar>
       </AppBar>
+
+      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <Box sx={{ width: 260 }} role="presentation">
+          <Box sx={{ p: 2 }}>
+            <Typography variant="h6">Navigation</Typography>
+          </Box>
+          <List>
+            {counselorTabs.map((tab, index) => (
+              <ListItem key={tab.label} disablePadding>
+                <ListItemButton
+                  selected={tabValue === index}
+                  onClick={() => {
+                    setTabValue(index);
+                    setDrawerOpen(false);
+                  }}
+                >
+                  <ListItemIcon>{tab.icon}</ListItemIcon>
+                  <ListItemText primary={tab.label} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+      </Drawer>
 
       <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
         <Container maxWidth="xl">

@@ -10,6 +10,7 @@ import {
   Toolbar,
   IconButton,
   Button,
+  Drawer,
   Card,
   CardContent,
   Table,
@@ -27,6 +28,8 @@ import {
   MenuItem,
   List,
   ListItem,
+  ListItemButton,
+  ListItemIcon,
   ListItemText,
   Tab,
   Tabs,
@@ -42,6 +45,7 @@ import {
   Assignment,
   Star,
   Visibility,
+  Menu as MenuIcon,
 } from '@mui/icons-material';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../context/AuthContext';
@@ -51,6 +55,7 @@ export default function TeacherDashboard() {
   const { user, logout } = useAuth();
   const config = getConfig();
   const [tabValue, setTabValue] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   
   // State
   const [students, setStudents] = useState([]);
@@ -91,6 +96,13 @@ export default function TeacherDashboard() {
   // Filter subjects based on what teacher teaches
   const teacherSubjects = user?.subjects || [];
   const subjects = allSubjects.filter(s => teacherSubjects.includes(s.id));
+
+  const teacherTabs = [
+    { label: 'Students', icon: <People /> },
+    { label: 'My AI Tutors', icon: <Star /> },
+    { label: 'Content Library', icon: <Assignment /> },
+    { label: 'Analytics', icon: <Analytics /> },
+  ];
 
   // Evaluation form
   const [evaluation, setEvaluation] = useState({
@@ -187,6 +199,13 @@ export default function TeacherDashboard() {
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <AppBar position="static" sx={{ bgcolor: '#757575' }}>
         <Toolbar>
+            <IconButton
+              color="inherit"
+              onClick={() => setDrawerOpen(true)}
+              sx={{ mr: 1, display: { xs: 'inline-flex', md: 'none' } }}
+            >
+              <MenuIcon />
+            </IconButton>
             <Box sx={{ p: 1, mr: 3 }}>
               <Box
                 component="img"
@@ -205,6 +224,7 @@ export default function TeacherDashboard() {
               value={tabValue} 
               onChange={(e, v) => setTabValue(v)} 
               sx={{ 
+                display: { xs: 'none', md: 'flex' },
                 '& .MuiTab-root': {
                   minHeight: 64,
                   textTransform: 'none',
@@ -220,10 +240,9 @@ export default function TeacherDashboard() {
                 }
               }}
             >
-              <Tab label="Students" icon={<People />} iconPosition="start" />
-              <Tab label="My AI Tutors" icon={<Star />} iconPosition="start" />
-              <Tab label="Content Library" icon={<Assignment />} iconPosition="start" />
-              <Tab label="Analytics" icon={<Analytics />} iconPosition="start" />
+              {teacherTabs.map((tab) => (
+                <Tab key={tab.label} label={tab.label} icon={tab.icon} iconPosition="start" />
+              ))}
             </Tabs>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -236,6 +255,30 @@ export default function TeacherDashboard() {
           </Box>
         </Toolbar>
       </AppBar>
+
+      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <Box sx={{ width: 260 }} role="presentation">
+          <Box sx={{ p: 2 }}>
+            <Typography variant="h6">Navigation</Typography>
+          </Box>
+          <List>
+            {teacherTabs.map((tab, index) => (
+              <ListItem key={tab.label} disablePadding>
+                <ListItemButton
+                  selected={tabValue === index}
+                  onClick={() => {
+                    setTabValue(index);
+                    setDrawerOpen(false);
+                  }}
+                >
+                  <ListItemIcon>{tab.icon}</ListItemIcon>
+                  <ListItemText primary={tab.label} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+      </Drawer>
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
 
@@ -297,11 +340,12 @@ export default function TeacherDashboard() {
                                 color="warning"
                               />
                             ) : (
-                              <Chip label="None" size="small" color="success" />
+                              <Chip label="No flags" size="small" color="success" />
                             )}
                           </TableCell>
                           <TableCell>
                             <Button
+                              variant="outlined"
                               size="small"
                               startIcon={<Visibility />}
                               onClick={() => viewStudentSessions(student)}
@@ -318,7 +362,7 @@ export default function TeacherDashboard() {
             </Grid>
           </Grid>
         )}
-
+        
         {/* Tab 1: My AI Tutors */}
         {tabValue === 1 && (
           <Grid container spacing={3}>
@@ -330,7 +374,6 @@ export default function TeacherDashboard() {
                 <Typography variant="body2" color="text.secondary" paragraph>
                   Review conversations for your subjects: {subjects.map(s => s.label).join(', ')}
                 </Typography>
-                
                 {subjects.length === 0 && (
                   <Alert severity="warning" sx={{ mb: 2 }}>
                     No subjects assigned. Please contact admin to assign subjects to your account.
