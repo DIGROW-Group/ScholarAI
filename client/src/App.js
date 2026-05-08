@@ -4,6 +4,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { getTheme } from './theme';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SnackbarProvider } from './context/SnackbarContext';
 
 // Pages
 import Login from './pages/Login';
@@ -70,7 +71,8 @@ function App() {
       <CssBaseline />
       <Router>
         <AuthProvider>
-          <Routes>
+          <SnackbarProvider>
+            <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route
@@ -121,7 +123,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
-          </Routes>
+            </Routes>
+          </SnackbarProvider>
         </AuthProvider>
       </Router>
     </ThemeProvider>

@@ -10,9 +10,9 @@ import {
   Link,
   Alert,
 } from '@mui/material';
-import { School } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { getConfig } from '../config/appConfig';
+import useForm from '../hooks/useForm';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -35,7 +35,23 @@ export default function Login() {
     setLogoUrl(newUrl);
   }, [config.logoImage, config.name]);
   
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const validateLogin = (values) => {
+    const errors = {};
+    if (!values.email?.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) {
+      errors.email = 'Enter a valid email address';
+    }
+    if (!values.password) {
+      errors.password = 'Password is required';
+    }
+    return errors;
+  };
+
+  const { values, errors, touched, handleChange, handleBlur, submit } = useForm(
+    { email: '', password: '' },
+    validateLogin
+  );
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -44,12 +60,13 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
 
-    console.log('Login form submitted with:', { email: formData.email });
+    console.log('Login form submitted with:', { email: values.email });
 
-    try {
-      const result = await login(formData.email, formData.password);
+    const submitted = await submit(async (formValues) => {
+      setLoading(true);
+      try {
+      const result = await login(formValues.email, formValues.password);
       console.log('Login result:', result);
       
       if (result.success) {
@@ -58,10 +75,15 @@ export default function Login() {
         console.error('Login failed:', result.error);
         setError(result.error || 'Login failed. Please check your credentials.');
       }
-    } catch (error) {
-      console.error('Login exception:', error);
-      setError('An unexpected error occurred. Please try again.');
-    } finally {
+      } catch (error) {
+        console.error('Login exception:', error);
+        setError('An unexpected error occurred. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    if (!submitted) {
       setLoading(false);
     }
   };
@@ -156,20 +178,28 @@ export default function Login() {
             <TextField
               fullWidth
               label="Email"
+              name="email"
               type="email"
               margin="normal"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              value={values.email}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              error={Boolean(touched.email && errors.email)}
+              helperText={touched.email ? errors.email : ''}
               required
               autoFocus
             />
             <TextField
               fullWidth
               label="Password"
+              name="password"
               type="password"
               margin="normal"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              value={values.password}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              error={Boolean(touched.password && errors.password)}
+              helperText={touched.password ? errors.password : ''}
               required
             />
             <Button

@@ -45,7 +45,6 @@ import {
   AdminPanelSettings,
   Class,
   Add,
-  PersonAdd,
   Delete,
   Dashboard,
   Psychology,
@@ -61,18 +60,24 @@ import {
   Computer,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import { useSnackbar } from '../context/SnackbarContext';
 import api from '../services/api';
 import TourEngine from '../components/OnboardingTour/TourEngine';
 import { tourConfigs } from '../components/OnboardingTour/tourConfigs';
+import StatCardSkeleton from '../components/skeletons/StatCardSkeleton';
+import DocumentCardSkeleton from '../components/skeletons/DocumentCardSkeleton';
+import StudentTableSkeleton from '../components/skeletons/StudentTableSkeleton';
+import EmptyState from '../components/EmptyState';
+import useForm from '../hooks/useForm';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
+  const { show } = useSnackbar();
   const config = getConfig();
   const [teachers, setTeachers] = useState([]);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [editDialog, setEditDialog] = useState(false);
   const [selectedSubjects, setSelectedSubjects] = useState([]);
-  const [successMessage, setSuccessMessage] = useState('');
   const [startTour, setStartTour] = useState(false);
 
   const tourRefs = {
@@ -89,21 +94,49 @@ export default function AdminDashboard() {
   const [manageStudentsDialog, setManageStudentsDialog] = useState(false);
   const [selectedClassroom, setSelectedClassroom] = useState(null);
   const [availableStudents, setAvailableStudents] = useState([]);
-  const [classroomForm, setClassroomForm] = useState({
-    name: '',
-    grade: '1ere Bac',
-    teacherId: '',
-    academicYear: '2024-2025',
-    description: ''
-  });
+  const validateClassroomForm = (values) => {
+    const errors = {};
+    if (!values.name?.trim()) errors.name = 'Classroom name is required';
+    if (!values.grade) errors.grade = 'Grade is required';
+    if (!values.teacherId) errors.teacherId = 'Teacher is required';
+    if (values.academicYear && !/^\d{4}-\d{4}$/.test(values.academicYear)) {
+      errors.academicYear = 'Use format YYYY-YYYY';
+    }
+    return errors;
+  };
+
+  const {
+    values: classroomForm,
+    errors: classroomErrors,
+    touched: classroomTouched,
+    handleChange: handleClassroomChange,
+    handleBlur: handleClassroomBlur,
+    submit: submitClassroom,
+    setValues: setClassroomForm,
+  } = useForm(
+    {
+      name: '',
+      grade: '1ere Bac',
+      teacherId: '',
+      academicYear: '2024-2025',
+      description: '',
+    },
+    validateClassroomForm
+  );
   const [tabValue, setTabValue] = useState(0);
   
   // Dashboard state
-  const [allUsers, setAllUsers] = useState([]);
   const [students, setStudents] = useState([]);
   const [counselors, setCounselors] = useState([]);
   const [parents, setParents] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [dashboardError, setDashboardError] = useState(null);
+  const [teachersLoading, setTeachersLoading] = useState(false);
+  const [teachersError, setTeachersError] = useState(null);
+  const [classroomsLoading, setClassroomsLoading] = useState(false);
+  const [classroomsError, setClassroomsError] = useState(null);
+  const onboardingCompleted = user?.onboardingCompleted;
+  const userId = user?.id;
 
   const availableSubjects = [
     { id: 'math', label: 'Maths', icon: Calculate },
@@ -121,10 +154,10 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!user || user.onboardingCompleted) return;
+    if (!userId || onboardingCompleted) return;
     const timer = setTimeout(() => setStartTour(true), 800);
     return () => clearTimeout(timer);
-  }, [user?.id, user?.onboardingCompleted]);
+  }, [userId, onboardingCompleted]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -145,14 +178,16 @@ export default function AdminDashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
+      setDashboardError(null);
       const res = await api.get('/admin/users');
       const users = res.data.users || [];
-      setAllUsers(users);
       setStudents(users.filter(u => u.role === 'student'));
       setCounselors(users.filter(u => u.role === 'counselor'));
       setParents(users.filter(u => u.role === 'parent'));
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
+      setDashboardError(error);
+      show('Failed to load dashboard data', 'error');
     } finally {
       setLoading(false);
     }
@@ -160,35 +195,48 @@ export default function AdminDashboard() {
 
   const loadTeachers = async () => {
     try {
+      setTeachersLoading(true);
+      setTeachersError(null);
       const res = await api.get('/admin/teachers');
       setTeachers(res.data.teachers);
     } catch (error) {
       console.error('Failed to load teachers:', error);
+      setTeachersError(error);
+      show('Failed to load teachers', 'error');
+    } finally {
+      setTeachersLoading(false);
     }
   };
 
   const loadClassrooms = async () => {
     try {
+      setClassroomsLoading(true);
+      setClassroomsError(null);
       const res = await api.get('/admin/classrooms');
       setClassrooms(res.data.classrooms);
     } catch (error) {
       console.error('Failed to load classrooms:', error);
+      setClassroomsError(error);
+      show('Failed to load classrooms', 'error');
+    } finally {
+      setClassroomsLoading(false);
     }
   };
 
   const handleCreateClassroom = async () => {
-    try {
-      await api.post('/admin/classrooms', classroomForm);
-      setSuccessMessage('Classroom created successfully!');
-      setCreateClassroomDialog(false);
-      setClassroomForm({ name: '', grade: '1ere Bac', teacherId: '', academicYear: '2024-2025', description: '' });
-      
-      loadClassrooms();
-      setTimeout(() => setSuccessMessage(''), 5000);
-    } catch (error) {
-      console.error('Failed to create classroom:', error);
-      alert('Failed to create classroom');
-    }
+    await submitClassroom(async (values) => {
+      try {
+        await api.post('/admin/classrooms', values);
+        show('Classroom created successfully!', 'success');
+        setCreateClassroomDialog(false);
+        setClassroomForm({ name: '', grade: '1ere Bac', teacherId: '', academicYear: '2024-2025', description: '' });
+
+        loadClassrooms();
+      } catch (error) {
+        console.error('Failed to create classroom:', error);
+        show(error.response?.data?.error || 'Failed to create classroom', 'error');
+      }
+    });
   };
 
   const handleManageStudents = async (classroom) => {
@@ -199,31 +247,32 @@ export default function AdminDashboard() {
       setManageStudentsDialog(true);
     } catch (error) {
       console.error('Failed to load available students:', error);
+      show('Failed to load available students', 'error');
     }
   };
 
   const handleAddStudent = async (studentId) => {
     try {
       await api.post(`/admin/classrooms/${selectedClassroom.id}/students`, { studentId });
-      setSuccessMessage('Student added to classroom!');
+      show('Student added to classroom!', 'success');
       loadClassrooms();
       handleManageStudents(selectedClassroom); // Refresh
-      setTimeout(() => setSuccessMessage(''), 5000);
     } catch (error) {
       console.error('Failed to add student:', error);
+      show(error.response?.data?.error || 'Failed to add student', 'error');
     }
   };
 
   const handleRemoveStudent = async (studentId) => {
     try {
       await api.delete(`/admin/classrooms/${selectedClassroom.id}/students/${studentId}`);
-      setSuccessMessage('Student removed from classroom!');
+      show('Student removed from classroom!', 'success');
       loadClassrooms();
       const updated = classrooms.find(c => c.id === selectedClassroom.id);
       setSelectedClassroom(updated);
-      setTimeout(() => setSuccessMessage(''), 5000);
     } catch (error) {
       console.error('Failed to remove student:', error);
+      show(error.response?.data?.error || 'Failed to remove student', 'error');
     }
   };
 
@@ -239,14 +288,12 @@ export default function AdminDashboard() {
         subjects: selectedSubjects
       });
       
-      setSuccessMessage(`Successfully updated subjects for ${selectedTeacher.firstName} ${selectedTeacher.lastName}`);
+      show(`Successfully updated subjects for ${selectedTeacher.firstName} ${selectedTeacher.lastName}`, 'success');
       setEditDialog(false);
       loadTeachers();
-      
-      setTimeout(() => setSuccessMessage(''), 5000);
     } catch (error) {
       console.error('Failed to update subjects:', error);
-      alert('Failed to update subjects');
+      show(error.response?.data?.error || 'Failed to update subjects', 'error');
     }
   };
 
@@ -312,12 +359,6 @@ export default function AdminDashboard() {
       </AppBar>
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
-        {successMessage && (
-          <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccessMessage('')}>
-            {successMessage}
-          </Alert>
-        )}
-
         {/* Tab 0: Dashboard */}
         {tabValue === 0 && (
           <Box>
@@ -338,6 +379,22 @@ export default function AdminDashboard() {
 
             {/* Statistics Cards */}
             <Grid ref={tourRefs.kpiCards} container spacing={3} sx={{ mb: 3 }}>
+              {loading ? (
+                <Grid item xs={12}>
+                  <StatCardSkeleton count={4} />
+                </Grid>
+              ) : dashboardError ? (
+                <Grid item xs={12}>
+                  <EmptyState
+                    variant="error"
+                    icon="📈"
+                    title="Couldn't load data"
+                    description="Please try again in a moment."
+                    actionLabel="Retry"
+                    onAction={loadDashboardData}
+                  />
+                </Grid>
+              ) : null}
               <Grid item xs={12} sm={6} md={3}>
                 <Card sx={{ background: 'linear-gradient(135deg, #ea9b20 0%, #FFB84D 100%)', color: 'white', height: '100%' }}>
                   <CardContent>
@@ -397,16 +454,25 @@ export default function AdminDashboard() {
 
             <Grid container spacing={3}>
               {/* Counselors Section */}
-              <Grid item xs={12} md={6}>
-                <Paper ref={tourRefs.counselorList} sx={{ p: 3, height: '100%' }}>
+                <Grid item xs={12} md={6}>
+                  <Paper ref={tourRefs.counselorList} sx={{ p: 3, height: '100%' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                     <Psychology sx={{ fontSize: 32, color: 'primary.main', mr: 1.5 }} />
                     <Typography variant="h5" fontWeight="bold">Counselors</Typography>
                   </Box>
-                  {counselors.length === 0 ? (
-                    <Typography color="text.secondary" align="center" sx={{ py: 3 }}>
-                      No counselors registered
-                    </Typography>
+                  {loading ? (
+                    <StudentTableSkeleton rows={3} cols={2} />
+                  ) : dashboardError ? (
+                    <EmptyState
+                      variant="error"
+                      icon="👨‍🏫"
+                      title="Couldn't load counselors"
+                      description="Please try again in a moment."
+                      actionLabel="Retry"
+                      onAction={loadDashboardData}
+                    />
+                  ) : counselors.length === 0 ? (
+                    <EmptyState icon="👨‍🏫" title="No counselors yet" description="Counselors will appear here once they are added." />
                   ) : (
                     <List>
                       {counselors.map((counselor) => (
@@ -439,7 +505,9 @@ export default function AdminDashboard() {
                     <Typography variant="h5" fontWeight="bold">AI Tutors</Typography>
                   </Box>
                   <Grid container spacing={2}>
-                    {availableSubjects.map((subject) => {
+                    {availableSubjects.length === 0 ? (
+                      <DocumentCardSkeleton count={3} />
+                    ) : availableSubjects.map((subject) => {
                       const subjectTeachers = teachers.filter(t => t.subjects?.includes(subject.id));
                       const SubjectIcon = subject.icon;
                       return (
@@ -488,10 +556,19 @@ export default function AdminDashboard() {
                     />
                   </Box>
                   
-                  {parents.length === 0 ? (
-                    <Typography color="text.secondary" align="center" sx={{ py: 3 }}>
-                      No parents registered
-                    </Typography>
+                  {loading ? (
+                    <StudentTableSkeleton rows={3} cols={4} />
+                  ) : dashboardError ? (
+                    <EmptyState
+                      variant="error"
+                      icon="📋"
+                      title="Couldn't load parent data"
+                      description="Please try again in a moment."
+                      actionLabel="Retry"
+                      onAction={loadDashboardData}
+                    />
+                  ) : parents.length === 0 ? (
+                    <EmptyState icon="📋" title="No parents yet" description="Parents will appear here once they are added." />
                   ) : (
                     <TableContainer>
                       <Table>
@@ -573,10 +650,25 @@ export default function AdminDashboard() {
             </Typography>
 
             <Box ref={tourRefs.classroomsGrid}>
-              {classrooms.length === 0 ? (
-                <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
-                  No classrooms created yet. Click "Create Classroom" to get started.
-                </Typography>
+              {classroomsLoading ? (
+                <DocumentCardSkeleton count={3} />
+              ) : classroomsError ? (
+                <EmptyState
+                  variant="error"
+                  icon="🏫"
+                  title="Couldn't load classrooms"
+                  description="Please try again in a moment."
+                  actionLabel="Retry"
+                  onAction={loadClassrooms}
+                />
+              ) : classrooms.length === 0 ? (
+                <EmptyState
+                  icon="🏫"
+                  title="No classrooms yet"
+                  description="Create your first classroom to get started."
+                  actionLabel="Create classroom"
+                  onAction={() => setCreateClassroomDialog(true)}
+                />
               ) : (
                 <Grid container spacing={3} sx={{ mt: 1 }}>
                   {classrooms.map((classroom) => {
@@ -704,10 +796,23 @@ export default function AdminDashboard() {
               </Box>
             </Box>
 
-            {teachers.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
-                No teachers found. They will appear here once they register.
-              </Typography>
+            {teachersLoading ? (
+              <StudentTableSkeleton rows={5} cols={3} />
+            ) : teachersError ? (
+              <EmptyState
+                variant="error"
+                icon="👨‍🏫"
+                title="Couldn't load teachers"
+                description="Please try again in a moment."
+                actionLabel="Retry"
+                onAction={loadTeachers}
+              />
+            ) : teachers.length === 0 ? (
+              <EmptyState
+                icon="👨‍🏫"
+                title="No teachers yet"
+                description="Add teachers to assign them to classrooms."
+              />
             ) : (
               <Grid container spacing={3}>
                 {teachers.map((teacher) => (
@@ -816,19 +921,27 @@ export default function AdminDashboard() {
           <TextField
             fullWidth
             label="Classroom Name"
+            name="name"
             value={classroomForm.name}
-            onChange={(e) => setClassroomForm({ ...classroomForm, name: e.target.value })}
+            onChange={handleClassroomChange}
+            onBlur={handleClassroomBlur}
             margin="normal"
             placeholder="e.g., 1ère Bac Sciences - Classe A"
+            error={Boolean(classroomTouched.name && classroomErrors.name)}
+            helperText={classroomTouched.name ? classroomErrors.name : ''}
             required
           />
           <TextField
             fullWidth
             select
             label="Grade"
+            name="grade"
             value={classroomForm.grade}
-            onChange={(e) => setClassroomForm({ ...classroomForm, grade: e.target.value })}
+            onChange={handleClassroomChange}
+            onBlur={handleClassroomBlur}
             margin="normal"
+            error={Boolean(classroomTouched.grade && classroomErrors.grade)}
+            helperText={classroomTouched.grade ? classroomErrors.grade : ''}
             required
           >
             <MenuItem value="1ere College">1ère Collège</MenuItem>
@@ -842,11 +955,14 @@ export default function AdminDashboard() {
             fullWidth
             select
             label="Teacher"
+            name="teacherId"
             value={classroomForm.teacherId}
-            onChange={(e) => setClassroomForm({ ...classroomForm, teacherId: e.target.value })}
+            onChange={handleClassroomChange}
+            onBlur={handleClassroomBlur}
             margin="normal"
             required
-            helperText="Students will automatically access this teacher's AI tutors"
+            helperText={classroomTouched.teacherId && classroomErrors.teacherId ? classroomErrors.teacherId : "Students will automatically access this teacher's AI tutors"}
+            error={Boolean(classroomTouched.teacherId && classroomErrors.teacherId)}
           >
             {teachers.map((teacher) => (
               <MenuItem key={teacher.id} value={teacher.id}>
@@ -857,16 +973,22 @@ export default function AdminDashboard() {
           <TextField
             fullWidth
             label="Academic Year"
+            name="academicYear"
             value={classroomForm.academicYear}
-            onChange={(e) => setClassroomForm({ ...classroomForm, academicYear: e.target.value })}
+            onChange={handleClassroomChange}
+            onBlur={handleClassroomBlur}
             margin="normal"
             placeholder="2024-2025"
+            error={Boolean(classroomTouched.academicYear && classroomErrors.academicYear)}
+            helperText={classroomTouched.academicYear ? classroomErrors.academicYear : ''}
           />
           <TextField
             fullWidth
             label="Description"
+            name="description"
             value={classroomForm.description}
-            onChange={(e) => setClassroomForm({ ...classroomForm, description: e.target.value })}
+            onChange={handleClassroomChange}
+            onBlur={handleClassroomBlur}
             margin="normal"
             multiline
             rows={2}

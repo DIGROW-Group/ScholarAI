@@ -238,27 +238,6 @@ export default function TourEngine({ steps, refs }) {
     setTooltipPos(clampToViewport({ ...fallback, tooltipSize, viewport, margin }));
   }, [open, activeIndex, targetRect, activeStep?.position]);
 
-  // Keyboard support.
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        handleSkip();
-        return;
-      }
-
-      if (e.key === 'ArrowRight' || e.key === 'Enter') {
-        e.preventDefault();
-        handleNext();
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, activeIndex, totalSteps]);
-
   const finishTour = useCallback(async () => {
     setOpen(false);
 
@@ -284,6 +263,27 @@ export default function TourEngine({ steps, refs }) {
     }
     setActiveIndex((prev) => prev + 1);
   }, [activeIndex, totalSteps, finishTour]);
+
+  // Keyboard support.
+  useEffect(() => {
+    if (!open) return;
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleSkip();
+        return;
+      }
+
+      if (e.key === 'ArrowRight' || e.key === 'Enter') {
+        e.preventDefault();
+        handleNext();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, handleNext, handleSkip]);
 
   const progressValue = totalSteps > 0 ? ((activeIndex + 1) / totalSteps) * 100 : 0;
 
