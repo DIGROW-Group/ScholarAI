@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import api from '../services/api';
+import api, { setAuthFailureHandler } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -16,20 +16,35 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setAuthFailureHandler(() => {
+      setUser(null);
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    });
+
     checkAuth();
   }, []);
 
   const checkAuth = async () => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const response = await api.get('/auth/me');
-        setUser(response.data.user);
-      } catch (error) {
+    try {
+      const response = await api.get('/auth/me');
+      setUser(response.data.user);
+    } catch (error) {
+      if (error.response?.status === 401) {
+        try {
+          await api.post('/auth/refresh');
+          const meResponse = await api.get('/auth/me');
+          setUser(meResponse.data.user);
+        } catch (refreshError) {
+          setUser(null);
+        }
+      } else {
         console.error('Auth check failed:', error);
-        localStorage.removeItem('token');
+        setUser(null);
       }
     }
+
     setLoading(false);
   };
 
@@ -37,8 +52,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('Attempting login for:', email);
       const response = await api.post('/auth/login', { email, password });
-      const { user, token } = response.data;
-      localStorage.setItem('token', token);
+      const { user } = response.data;
       setUser(user);
       console.log('Login successful for:', email);
       return { success: true };
@@ -58,8 +72,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       const response = await api.post('/auth/register', userData);
-      const { user, token } = response.data;
-      localStorage.setItem('token', token);
+      const { user } = response.data;
       setUser(user);
       return { success: true };
     } catch (error) {
@@ -70,8 +83,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout request failed:', error);
+    }
     setUser(null);
   };
 

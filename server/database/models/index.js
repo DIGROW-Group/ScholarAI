@@ -12,6 +12,7 @@ const Alert = require('./Alert');
 const Classroom = require('./Classroom');
 const StudentClassroom = require('./StudentClassroom');
 const TeacherClassroom = require('./TeacherClassroom');
+const RefreshToken = require('./RefreshToken');
 
 // Define associations
 User.hasMany(TutoringSession, { foreignKey: 'studentId', as: 'sessions' });
@@ -80,6 +81,9 @@ Classroom.belongsToMany(User, {
   foreignKey: 'classroomId'
 });
 
+User.hasMany(RefreshToken, { foreignKey: 'userId', as: 'refreshTokens' });
+RefreshToken.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 module.exports = {
   sequelize,
   User,
@@ -92,6 +96,7 @@ module.exports = {
   Alert,
   Classroom,
   StudentClassroom,
-  TeacherClassroom
+  TeacherClassroom,
+  RefreshToken
 };
 
