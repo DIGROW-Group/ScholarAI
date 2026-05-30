@@ -10,10 +10,6 @@ import {
   Link,
   Alert,
   MenuItem,
-  Checkbox,
-  FormControlLabel,
-  FormGroup,
-  FormLabel,
 } from '@mui/material';
 import { School } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
@@ -62,19 +58,16 @@ export default function Register() {
     { id: 'informatique', label: 'IT', icon: '💻' },
   ];
   const [error, setError] = useState('');
+  const [errorDetails, setErrorDetails] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setErrorDetails([]);
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
-      return;
-    }
-
-    if (formData.role === 'teacher' && formData.subjects.length === 0) {
-      setError('Teachers must select at least one subject');
       return;
     }
 
@@ -86,7 +79,10 @@ export default function Register() {
     if (result.success) {
       navigate('/');
     } else {
-      setError(result.error);
+      setError(result.error || 'Registration failed');
+      if (Array.isArray(result.details)) {
+        setErrorDetails(result.details);
+      }
     }
     
     setLoading(false);
@@ -177,6 +173,15 @@ export default function Register() {
           {error && (
             <Alert severity="error" sx={{ mb: 2, width: '100%' }}>
               {error}
+              {errorDetails.length > 0 && (
+                <Box component="ul" sx={{ mt: 1, mb: 0, pl: 3 }}>
+                  {errorDetails.map((detail) => (
+                    <Box component="li" key={detail}>
+                      {detail}
+                    </Box>
+                  ))}
+                </Box>
+              )}
             </Alert>
           )}
 
@@ -215,11 +220,10 @@ export default function Register() {
               value={formData.role}
               onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               required
+              helperText="Self-service registration is available for students and parents only"
             >
               <MenuItem value="student">Student</MenuItem>
-              <MenuItem value="teacher">Teacher</MenuItem>
               <MenuItem value="parent">Parent</MenuItem>
-              <MenuItem value="counselor">Academic Counselor</MenuItem>
             </TextField>
             {formData.role === 'student' && (
               <TextField
@@ -241,37 +245,6 @@ export default function Register() {
               </TextField>
             )}
             
-            {formData.role === 'teacher' && (
-              <Box sx={{ mt: 2, mb: 1 }}>
-                <FormLabel component="legend" sx={{ mb: 1 }}>
-                  Subjects You Teach *
-                </FormLabel>
-                <FormGroup row>
-                  {availableSubjects.map((subject) => (
-                    <FormControlLabel
-                      key={subject.id}
-                      control={
-                        <Checkbox
-                          checked={formData.subjects.includes(subject.id)}
-                          onChange={(e) => {
-                            const newSubjects = e.target.checked
-                              ? [...formData.subjects, subject.id]
-                              : formData.subjects.filter(s => s !== subject.id);
-                            setFormData({ ...formData, subjects: newSubjects });
-                          }}
-                        />
-                      }
-                      label={`${subject.icon} ${subject.label}`}
-                    />
-                  ))}
-                </FormGroup>
-                {formData.subjects.length === 0 && (
-                  <Typography variant="caption" color="error">
-                    Please select at least one subject
-                  </Typography>
-                )}
-              </Box>
-            )}
             <TextField
               fullWidth
               label="Password"

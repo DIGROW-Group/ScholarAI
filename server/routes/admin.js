@@ -5,6 +5,7 @@ const { auth, roleAuth } = require('../middleware/auth');
 
 // Admin-only routes
 router.get('/teachers', auth, roleAuth('admin'), adminController.getTeachers);
+router.post('/staff', auth, roleAuth('admin'), adminController.createStaffUser);
 router.patch('/teachers/:teacherId/subjects', auth, roleAuth('admin'), adminController.updateTeacherSubjects);
 router.get('/users', auth, roleAuth('admin'), adminController.getAllUsers);
 

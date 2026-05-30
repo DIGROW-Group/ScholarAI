@@ -37,6 +37,7 @@ export default function Login() {
   
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [errorDetails, setErrorDetails] = useState([]);
   const [loading, setLoading] = useState(false);
   
   console.log('Login render - Current logoUrl:', logoUrl, 'Config logo:', config.logoImage, 'Config name:', config.name);
@@ -44,6 +45,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setErrorDetails([]);
     setLoading(true);
 
     console.log('Login form submitted with:', { email: formData.email });
@@ -56,7 +58,14 @@ export default function Login() {
         navigate('/');
       } else {
         console.error('Login failed:', result.error);
-        setError(result.error || 'Login failed. Please check your credentials.');
+        if (result.status === 429) {
+          setError('Too many failed attempts. Please wait and try again.');
+        } else {
+          setError(result.error || 'Login failed. Please check your credentials.');
+        }
+        if (Array.isArray(result.details)) {
+          setErrorDetails(result.details);
+        }
       }
     } catch (error) {
       console.error('Login exception:', error);
@@ -157,6 +166,15 @@ export default function Login() {
           {error && (
             <Alert severity="error" sx={{ mb: 2, width: '100%' }}>
               {error}
+              {errorDetails.length > 0 && (
+                <Box component="ul" sx={{ mt: 1, mb: 0, pl: 3 }}>
+                  {errorDetails.map((detail) => (
+                    <Box component="li" key={detail}>
+                      {detail}
+                    </Box>
+                  ))}
+                </Box>
+              )}
             </Alert>
           )}
 

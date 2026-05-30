@@ -28,6 +28,13 @@ services:
       - chroma_data:/chroma/chroma
     restart: unless-stopped
 
+  clamd:
+    image: clamav/clamav:latest
+    container_name: rmatss-clamd
+    ports:
+      - "3310:3310"
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -45,12 +52,18 @@ services:
       - JWT_SECRET=${JWT_SECRET:-change_this_secret_in_production}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CLAMAV_ENABLED=true
+      - CLAMD_HOST=clamd
+      - CLAMD_PORT=3310
+      - CLAMD_TIMEOUT_MS=60000
     ports:
       - "5001:5001"
     depends_on:
       postgres:
         condition: service_healthy
       chroma:
+        condition: service_started
+      clamd:
         condition: service_started
     restart: unless-stopped
     volumes:

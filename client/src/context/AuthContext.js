@@ -50,7 +50,9 @@ export const AuthProvider = ({ children }) => {
       console.error('Error message:', errorMessage);
       return {
         success: false,
-        error: errorMessage
+        error: errorMessage,
+        status: error.response?.status,
+        details: error.response?.data?.details
       };
     }
   };
@@ -65,7 +67,9 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.error || 'Registration failed'
+        error: error.response?.data?.error || 'Registration failed',
+        status: error.response?.status,
+        details: error.response?.data?.details
       };
     }
   };

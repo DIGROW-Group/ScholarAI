@@ -10,20 +10,30 @@ const generateToken = (userId) => {
 exports.register = async (req, res) => {
   try {
     const { email, password, firstName, lastName, role, grade, subjects } = req.body;
+    const normalizedEmail = typeof email === 'string' ? email.toLowerCase() : email;
+    const allowedSelfServiceRoles = new Set(['student', 'parent']);
+    const normalizedRole = role || 'student';
+
+    if (!allowedSelfServiceRoles.has(normalizedRole)) {
+      return res.status(400).json({
+        error: 'Role is invalid',
+        details: ['Self-service registration is limited to student and parent accounts']
+      });
+    }
 
     // Check if user exists
-    const existingUser = await User.findOne({ where: { email } });
+    const existingUser = await User.findOne({ where: { email: normalizedEmail } });
     if (existingUser) {
       return res.status(400).json({ error: 'Email already registered' });
     }
 
     // Create user
     const user = await User.create({
-      email,
+      email: normalizedEmail,
       password,
       firstName,
       lastName,
-      role: role || 'student',
+      role: normalizedRole,
       grade,
       subjects: subjects || []
     });
@@ -56,20 +66,21 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = typeof email === 'string' ? email.toLowerCase() : email;
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({ where: { email: normalizedEmail } });
     if (!user) {
-      console.log(`Login attempt failed: User not found for email: ${email}`);
+      console.log(`Login attempt failed: User not found for email: ${normalizedEmail}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      console.log(`Login attempt failed: Invalid password for email: ${email}`);
+      console.log(`Login attempt failed: Invalid password for email: ${normalizedEmail}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 

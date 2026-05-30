@@ -1,6 +1,9 @@
 const { User, Classroom, StudentClassroom } = require('../database/models');
 const { Op } = require('sequelize');
 
+const VALID_STAFF_ROLES = new Set(['teacher', 'counselor']);
+const VALID_SUBJECTS = ['math', 'physics', 'arabic', 'english', 'french', 'informatique'];
+
 exports.getTeachers = async (req, res) => {
   try {
     const teachers = await User.findAll({
@@ -13,6 +16,57 @@ exports.getTeachers = async (req, res) => {
   } catch (error) {
     console.error('Get teachers error:', error);
     res.status(500).json({ error: 'Failed to fetch teachers' });
+  }
+};
+
+exports.createStaffUser = async (req, res) => {
+  try {
+    const { email, password, firstName, lastName, role, subjects } = req.body;
+
+    if (!VALID_STAFF_ROLES.has(role)) {
+      return res.status(400).json({ error: 'Role must be teacher or counselor' });
+    }
+
+    if (role === 'teacher') {
+      if (!Array.isArray(subjects) || subjects.length === 0) {
+        return res.status(400).json({ error: 'Teachers must have at least one subject' });
+      }
+
+      const invalidSubjects = subjects.filter((subject) => !VALID_SUBJECTS.includes(subject));
+      if (invalidSubjects.length > 0) {
+        return res.status(400).json({ error: 'Invalid subjects provided' });
+      }
+    }
+
+    const normalizedEmail = typeof email === 'string' ? email.toLowerCase() : email;
+    const existingUser = await User.findOne({ where: { email: normalizedEmail } });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email already registered' });
+    }
+
+    const user = await User.create({
+      email: normalizedEmail,
+      password,
+      firstName,
+      lastName,
+      role,
+      subjects: role === 'teacher' ? subjects : []
+    });
+
+    return res.status(201).json({
+      message: `${role === 'teacher' ? 'Teacher' : 'Counselor'} account created successfully`,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        subjects: user.subjects || []
+      }
+    });
+  } catch (error) {
+    console.error('Create staff user error:', error);
+    res.status(500).json({ error: 'Failed to create staff account' });
   }
 };
 
@@ -30,8 +84,7 @@ exports.updateTeacherSubjects = async (req, res) => {
     }
 
     // Validate subjects
-    const validSubjects = ['math', 'physics', 'arabic', 'english', 'french', 'informatique'];
-    const invalidSubjects = subjects.filter(s => !validSubjects.includes(s));
+    const invalidSubjects = subjects.filter(s => !VALID_SUBJECTS.includes(s));
     
     if (invalidSubjects.length > 0) {
       return res.status(400).json({ error: 'Invalid subjects provided' });

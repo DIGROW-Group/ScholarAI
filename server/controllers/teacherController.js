@@ -4,6 +4,25 @@ const RAGService = require('../services/RAGService');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
+const clamd = require('clamdjs');
+
+const clamdEnabled = process.env.CLAMAV_ENABLED !== 'false';
+const clamdHost = process.env.CLAMD_HOST || 'clamd';
+const clamdPort = parseInt(process.env.CLAMD_PORT, 10) || 3310;
+const clamdTimeoutMs = parseInt(process.env.CLAMD_TIMEOUT_MS, 10) || 60000;
+
+const scanUpload = async (filePath) => {
+  if (!clamdEnabled) {
+    return { skipped: true };
+  }
+
+  const scanner = clamd.createScanner(clamdHost, clamdPort);
+  const reply = await scanner.scanFile(filePath, clamdTimeoutMs);
+  const infected = !clamd.isCleanReply(reply);
+  const viruses = infected ? [reply] : [];
+
+  return { infected, viruses, reply };
+};
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -22,11 +41,17 @@ const upload = multer({
   storage,
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /pdf|txt|doc|docx/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (extname && mimetype) {
+    const allowedExts = new Set(['.pdf', '.txt', '.doc', '.docx']);
+    const allowedMimes = new Set([
+      'application/pdf',
+      'text/plain',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ]);
+    const extname = path.extname(file.originalname).toLowerCase();
+    const mimetype = file.mimetype;
+
+    if (allowedExts.has(extname) && allowedMimes.has(mimetype)) {
       return cb(null, true);
     } else {
       cb(new Error('Only PDF, TXT, DOC files are allowed'));
@@ -44,6 +69,18 @@ exports.uploadDocument = async (req, res) => {
 
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    try {
+      const scanResult = await scanUpload(req.file.path);
+      if (scanResult.infected) {
+        await fs.unlink(req.file.path).catch(() => undefined);
+        return res.status(422).json({ error: 'File rejected by antivirus scan', details: scanResult.viruses });
+      }
+    } catch (scanError) {
+      console.error('Antivirus scan failed:', scanError);
+      await fs.unlink(req.file.path).catch(() => undefined);
+      return res.status(503).json({ error: 'Antivirus service unavailable' });
     }
 
     // Check if teacher is authorized for this subject

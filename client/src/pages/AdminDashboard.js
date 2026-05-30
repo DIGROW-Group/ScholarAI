@@ -80,6 +80,7 @@ export default function AdminDashboard() {
   const [classrooms, setClassrooms] = useState([]);
   const [createClassroomDialog, setCreateClassroomDialog] = useState(false);
   const [manageStudentsDialog, setManageStudentsDialog] = useState(false);
+  const [createStaffDialog, setCreateStaffDialog] = useState(false);
   const [selectedClassroom, setSelectedClassroom] = useState(null);
   const [availableStudents, setAvailableStudents] = useState([]);
   const [classroomForm, setClassroomForm] = useState({
@@ -88,6 +89,14 @@ export default function AdminDashboard() {
     teacherId: '',
     academicYear: '2024-2025',
     description: ''
+  });
+  const [staffForm, setStaffForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    role: 'teacher',
+    subjects: []
   });
   const [tabValue, setTabValue] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -208,6 +217,35 @@ export default function AdminDashboard() {
     setSelectedTeacher(teacher);
     setSelectedSubjects(teacher.subjects || []);
     setEditDialog(true);
+  };
+
+  const handleCreateStaff = async () => {
+    try {
+      await api.post('/admin/staff', staffForm);
+      setSuccessMessage(`${staffForm.role === 'teacher' ? 'Teacher' : 'Counselor'} created successfully!`);
+      setCreateStaffDialog(false);
+      setStaffForm({ firstName: '', lastName: '', email: '', password: '', role: 'teacher', subjects: [] });
+      loadDashboardData();
+      loadTeachers();
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (error) {
+      console.error('Failed to create staff account:', error);
+      alert(error.response?.data?.error || 'Failed to create staff account');
+    }
+  };
+
+  const toggleStaffSubject = (subjectId) => {
+    if (staffForm.subjects.includes(subjectId)) {
+      setStaffForm({
+        ...staffForm,
+        subjects: staffForm.subjects.filter((subject) => subject !== subjectId)
+      });
+    } else {
+      setStaffForm({
+        ...staffForm,
+        subjects: [...staffForm.subjects, subjectId]
+      });
+    }
   };
 
   const handleSaveSubjects = async () => {
@@ -710,6 +748,19 @@ export default function AdminDashboard() {
                   Assign AI tutors (subjects) to teachers. Teachers can only access data for their assigned subjects.
                 </Typography>
               </Box>
+              <Button
+                variant="contained"
+                startIcon={<PersonAdd />}
+                onClick={() => setCreateStaffDialog(true)}
+                sx={{
+                  background: 'linear-gradient(135deg, #ea9b20 0%, #FFB84D 100%)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #C77A0A 0%, #ea9b20 100%)',
+                  }
+                }}
+              >
+                Add Staff
+              </Button>
             </Box>
 
             {teachers.length === 0 ? (
@@ -888,6 +939,103 @@ export default function AdminDashboard() {
             disabled={!classroomForm.name || !classroomForm.teacherId}
           >
             Create Classroom
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create Staff Dialog */}
+      <Dialog open={createStaffDialog} onClose={() => setCreateStaffDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Create Teacher or Counselor</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="First Name"
+            value={staffForm.firstName}
+            onChange={(e) => setStaffForm({ ...staffForm, firstName: e.target.value })}
+            margin="normal"
+            required
+          />
+          <TextField
+            fullWidth
+            label="Last Name"
+            value={staffForm.lastName}
+            onChange={(e) => setStaffForm({ ...staffForm, lastName: e.target.value })}
+            margin="normal"
+            required
+          />
+          <TextField
+            fullWidth
+            label="Email"
+            type="email"
+            value={staffForm.email}
+            onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })}
+            margin="normal"
+            required
+          />
+          <TextField
+            fullWidth
+            label="Temporary Password"
+            type="password"
+            value={staffForm.password}
+            onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })}
+            margin="normal"
+            required
+            helperText="Set an initial password for the new account"
+          />
+          <TextField
+            fullWidth
+            select
+            label="Role"
+            value={staffForm.role}
+            onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value, subjects: e.target.value === 'teacher' ? staffForm.subjects : [] })}
+            margin="normal"
+            required
+          >
+            <MenuItem value="teacher">Teacher</MenuItem>
+            <MenuItem value="counselor">Academic Counselor</MenuItem>
+          </TextField>
+
+          {staffForm.role === 'teacher' && (
+            <Box sx={{ mt: 2 }}>
+              <FormLabel component="legend" sx={{ mb: 1 }}>
+                Subjects *
+              </FormLabel>
+              <FormGroup row>
+                {availableSubjects.map((subject) => (
+                  <FormControlLabel
+                    key={subject.id}
+                    control={
+                      <Checkbox
+                        checked={staffForm.subjects.includes(subject.id)}
+                        onChange={() => toggleStaffSubject(subject.id)}
+                      />
+                    }
+                    label={`${subject.icon} ${subject.label}`}
+                  />
+                ))}
+              </FormGroup>
+              {staffForm.subjects.length === 0 && (
+                <Typography variant="caption" color="error">
+                  Teachers must have at least one subject
+                </Typography>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateStaffDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleCreateStaff}
+            disabled={
+              !staffForm.firstName ||
+              !staffForm.lastName ||
+              !staffForm.email ||
+              !staffForm.password ||
+              (staffForm.role === 'teacher' && staffForm.subjects.length === 0)
+            }
+          >
+            Create Account
           </Button>
         </DialogActions>
       </Dialog>
