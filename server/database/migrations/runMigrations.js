@@ -4,13 +4,13 @@ async function runMigrations() {
   try {
     console.log('🔄 Running database migrations...');
     
-    // Authenticate connection
-    await sequelize.authenticate();
-    console.log('✓ Database connection established');
-
-    // Sync all models
-    await sequelize.sync({ alter: true });
-    console.log('✓ All models synchronized');
+    if (process.env.NODE_ENV !== 'production') {
+      await sequelize.sync({ alter: true });
+      console.log('Dev: database synced');
+    } else {
+      await sequelize.authenticate();
+      console.log('Production: connection verified — migrations handle schema');
+    }
 
     console.log('✅ Migrations completed successfully!\n');
     process.exit(0);

@@ -4,9 +4,21 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const cron = require('node-cron');
+const cookieParser = require('cookie-parser');
+const { Op } = require('sequelize');
 require('dotenv').config();
 
-const { sequelize } = require('./database/models');
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  console.error('FATAL: JWT_SECRET is missing or too short (min 32 chars). Exiting.');
+  process.exit(1);
+}
+
+if (!process.env.JWT_REFRESH_SECRET || process.env.JWT_REFRESH_SECRET.length < 32) {
+  console.error('FATAL: JWT_REFRESH_SECRET is missing or too short (min 32 chars). Exiting.');
+  process.exit(1);
+}
+
+const { sequelize, RefreshToken } = require('./database/models');
 const RAGService = require('./services/RAGService');
 const counselorController = require('./controllers/counselorController');
 
@@ -29,7 +41,11 @@ app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
+app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(morgan('dev'));
@@ -79,13 +95,13 @@ app.use((err, req, res, next) => {
 // Initialize and start server
 async function startServer() {
   try {
-    // Test database connection
-    await sequelize.authenticate();
-    console.log('✓ Database connection established');
-
-    // Sync database (use { force: false } in production)
-    await sequelize.sync({ alter: process.env.NODE_ENV === 'development' });
-    console.log('✓ Database synchronized');
+    if (process.env.NODE_ENV !== 'production') {
+      await sequelize.sync({ alter: true });
+      console.log('Dev: database synced');
+    } else {
+      await sequelize.authenticate();
+      console.log('Production: connection verified — migrations handle schema');
+    }
 
     // Initialize RAG service
     await RAGService.initialize();
@@ -121,6 +137,25 @@ async function startServer() {
       timezone: 'UTC'
     });
     console.log('✓ Weekly analysis cron job scheduled (Sundays at 2:00 AM UTC)');
+
+    cron.schedule('0 0 * * *', async () => {
+      try {
+        const deletedCount = await RefreshToken.destroy({
+          where: {
+            expiresAt: {
+              [Op.lt]: new Date()
+            }
+          }
+        });
+        console.log(`✓ Refresh token cleanup completed. Removed ${deletedCount} expired tokens.`);
+      } catch (error) {
+        console.error('❌ Refresh token cleanup job failed:', error);
+      }
+    }, {
+      scheduled: true,
+      timezone: 'UTC'
+    });
+    console.log('✓ Daily refresh token cleanup cron job scheduled (00:00 UTC)');
 
     // Start server
     app.listen(PORT, () => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getConfig } from '../config/appConfig';
 import {
   Box,
@@ -32,7 +32,6 @@ import {
   Divider,
 } from '@mui/material';
 import {
-  School,
   Logout,
   PersonAdd,
   TrendingUp,
@@ -40,26 +39,67 @@ import {
   Warning,
   CheckCircle,
 } from '@mui/icons-material';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { useAuth } from '../context/AuthContext';
+import { useSnackbar } from '../context/SnackbarContext';
+import SessionListSkeleton from '../components/skeletons/SessionListSkeleton';
+import AttendanceTableSkeleton from '../components/skeletons/AttendanceTableSkeleton';
+import StatCardSkeleton from '../components/skeletons/StatCardSkeleton';
+import EmptyState from '../components/EmptyState';
 import api from '../services/api';
+import TourEngine from '../components/OnboardingTour/TourEngine';
+import { tourConfigs } from '../components/OnboardingTour/tourConfigs';
+import useForm from '../hooks/useForm';
 
 const COLORS = ['#FF6B35', '#424242', '#757575', '#FF8C5A'];
 
 export default function ParentDashboard() {
   const { user, logout } = useAuth();
+  const { show } = useSnackbar();
   const config = getConfig();
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
   const [childOverview, setChildOverview] = useState(null);
   const [attendance, setAttendance] = useState([]);
   const [alerts, setAlerts] = useState([]);
+  const [childrenLoading, setChildrenLoading] = useState(false);
+  const [childrenError, setChildrenError] = useState(null);
+  const [childLoading, setChildLoading] = useState(false);
+  const [childDataError, setChildDataError] = useState(null);
   const [linkDialog, setLinkDialog] = useState(false);
-  const [studentEmail, setStudentEmail] = useState('');
+  const [startTour, setStartTour] = useState(false);
+  const [resolvedTourSteps, setResolvedTourSteps] = useState([]);
+  const onboardingCompleted = user?.onboardingCompleted;
+  const userId = user?.id;
 
-  useEffect(() => {
-    loadChildren();
-  }, []);
+  const validateLinkChild = (values) => {
+    const errors = {};
+    if (!values.studentEmail?.trim()) {
+      errors.studentEmail = 'Child email is required';
+    } else if (!/^\S+@\S+\.\S+$/.test(values.studentEmail.trim())) {
+      errors.studentEmail = 'Enter a valid email address';
+    }
+    return errors;
+  };
+
+  const {
+    values: linkForm,
+    errors: linkErrors,
+    touched: linkTouched,
+    handleChange: handleLinkChange,
+    handleBlur: handleLinkBlur,
+    submit: submitLink,
+    setValues: setLinkForm,
+  } = useForm({ studentEmail: '' }, validateLinkChild);
+
+  const tourRefs = {
+    childSelector: useRef(null),
+    linkChildButton: useRef(null),
+    summaryCards: useRef(null),
+    masteryBars: useRef(null),
+    attendancePie: useRef(null),
+    alertsPanel: useRef(null),
+  };
 
   useEffect(() => {
     if (selectedChild) {
@@ -67,20 +107,51 @@ export default function ParentDashboard() {
     }
   }, [selectedChild]);
 
-  const loadChildren = async () => {
+  useEffect(() => {
+    if (!userId || onboardingCompleted) return;
+    const timer = setTimeout(() => setStartTour(true), 800);
+    return () => clearTimeout(timer);
+  }, [userId, onboardingCompleted]);
+
+  useEffect(() => {
+    if (!startTour) return;
+
+    if (children.length === 0) {
+      setResolvedTourSteps(
+        tourConfigs.parent.filter((step) => ['childSelector', 'linkChildButton'].includes(step.refKey))
+      );
+      return;
+    }
+
+    setResolvedTourSteps(tourConfigs.parent);
+  }, [startTour, children.length]);
+
+  const loadChildren = useCallback(async () => {
     try {
+      setChildrenLoading(true);
+      setChildrenError(null);
       const res = await api.get('/parent/children');
       setChildren(res.data.children);
-      if (res.data.children.length > 0 && !selectedChild) {
-        setSelectedChild(res.data.children[0]);
+      if (res.data.children.length > 0) {
+        setSelectedChild((currentSelected) => currentSelected || res.data.children[0]);
       }
     } catch (error) {
       console.error('Failed to load children:', error);
+      setChildrenError(error);
+      show('Failed to load children', 'error');
+    } finally {
+      setChildrenLoading(false);
     }
-  };
+  }, [show]);
+
+  useEffect(() => {
+    loadChildren();
+  }, [loadChildren]);
 
   const loadChildData = async (childId) => {
     try {
+      setChildLoading(true);
+      setChildDataError(null);
       const [overviewRes, attendanceRes, alertsRes] = await Promise.all([
         api.get(`/parent/child/${childId}/overview`),
         api.get(`/parent/child/${childId}/attendance?days=30`),
@@ -92,29 +163,27 @@ export default function ParentDashboard() {
       setAlerts(alertsRes.data.alerts);
     } catch (error) {
       console.error('Failed to load child data:', error);
+      setChildDataError(error);
+      show('Failed to load child data', 'error');
+    } finally {
+      setChildLoading(false);
     }
   };
 
   const handleLinkChild = async () => {
-    try {
-      await api.post('/parent/children/link', { studentEmail });
-      setLinkDialog(false);
-      setStudentEmail('');
-      loadChildren();
-      alert('Child linked successfully!');
-    } catch (error) {
-      console.error('Failed to link child:', error);
-      alert(error.response?.data?.error || 'Failed to link child');
-    }
-  };
+    await submitLink(async (values) => {
+      try {
+        await api.post('/parent/children/link', { studentEmail: values.studentEmail.trim() });
+        setLinkDialog(false);
+        setLinkForm({ studentEmail: '' });
 
-  const getAttendanceChartData = () => {
-    if (!attendance.length) return [];
-    
-    return attendance.slice(0, 7).reverse().map((a) => ({
-      date: new Date(a.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      status: a.status === 'present' ? 1 : a.status === 'late' ? 0.5 : 0,
-    }));
+        loadChildren();
+        show('Child linked successfully!', 'success');
+      } catch (error) {
+        console.error('Failed to link child:', error);
+        show(error.response?.data?.error || 'Failed to link child', 'error');
+      }
+    });
   };
 
   const getAttendancePieData = () => {
@@ -159,7 +228,7 @@ export default function ParentDashboard() {
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
         {/* Child Selector */}
-        <Paper sx={{ p: 2, mb: 3 }}>
+        <Paper ref={tourRefs.childSelector} sx={{ p: 2, mb: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box>
               <Typography variant="h6" gutterBottom>
@@ -180,6 +249,7 @@ export default function ParentDashboard() {
               variant="outlined"
               startIcon={<PersonAdd />}
               onClick={() => setLinkDialog(true)}
+              ref={tourRefs.linkChildButton}
             >
               Link Child
             </Button>
@@ -189,9 +259,11 @@ export default function ParentDashboard() {
         {selectedChild && childOverview ? (
           <>
             {/* Alerts Section */}
-            {alerts.filter(a => a.severity === 'critical' || a.severity === 'warning').slice(0, 3).length > 0 && (
-              <Box sx={{ mb: 3 }}>
-                {alerts
+            <Box ref={tourRefs.alertsPanel} sx={{ mb: 3 }}>
+              {childLoading ? (
+                <SessionListSkeleton rows={2} />
+              ) : alerts.filter(a => a.severity === 'critical' || a.severity === 'warning').slice(0, 3).length > 0 ? (
+                alerts
                   .filter(a => a.severity === 'critical' || a.severity === 'warning')
                   .slice(0, 3)
                   .map((alert) => (
@@ -203,12 +275,23 @@ export default function ParentDashboard() {
                     >
                       <strong>{alert.title}</strong>: {alert.message}
                     </Alert>
-                  ))}
-              </Box>
-            )}
+                  ))
+              ) : (
+                <EmptyState icon="✅" title="No alerts" description="You're all caught up." />
+              )}
+            </Box>
 
             {/* Summary Cards */}
-            <Grid container spacing={3} sx={{ mb: 3 }}>
+            <Grid ref={tourRefs.summaryCards} container spacing={3} sx={{ mb: 3 }}>
+              {childLoading ? (
+                <Grid item xs={12}>
+                  <StatCardSkeleton />
+                </Grid>
+              ) : !childOverview ? (
+                <Grid item xs={12}>
+                  <EmptyState icon="📋" title="No data available" description="Link a child account to see their stats." />
+                </Grid>
+              ) : null}
               <Grid item xs={12} md={3}>
                 <Card>
                   <CardContent>
@@ -281,7 +364,7 @@ export default function ParentDashboard() {
             {/* Performance Overview */}
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
-                <Paper sx={{ p: 3 }}>
+                <Paper ref={tourRefs.masteryBars} sx={{ p: 3 }}>
                   <Typography variant="h6" gutterBottom>
                     <TrendingUp sx={{ mr: 1, verticalAlign: 'middle' }} />
                     Subject Mastery
@@ -342,7 +425,7 @@ export default function ParentDashboard() {
               </Grid>
 
               <Grid item xs={12} md={6}>
-                <Paper sx={{ p: 3, mb: 3 }}>
+                <Paper ref={tourRefs.attendancePie} sx={{ p: 3, mb: 3 }}>
                   <Typography variant="h6" gutterBottom>
                     <CalendarToday sx={{ mr: 1, verticalAlign: 'middle' }} />
                     Attendance Overview
@@ -415,46 +498,52 @@ export default function ParentDashboard() {
                   <Typography variant="h6" gutterBottom>
                     Recent Attendance (Last 30 Days)
                   </Typography>
-                  <TableContainer>
-                    <Table>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Date</TableCell>
-                          <TableCell>Check-In Time</TableCell>
-                          <TableCell>Check-Out Time</TableCell>
-                          <TableCell>Status</TableCell>
-                          <TableCell>Anomalies</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {attendance.slice(0, 10).map((record) => (
-                          <TableRow key={record.id}>
-                            <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
-                            <TableCell>{record.checkInTime || 'N/A'}</TableCell>
-                            <TableCell>{record.checkOutTime || 'N/A'}</TableCell>
-                            <TableCell>
-                              <Chip
-                                label={record.status}
-                                size="small"
-                                color={
-                                  record.status === 'present'
-                                    ? 'success'
-                                    : record.status === 'late'
-                                    ? 'warning'
-                                    : 'error'
-                                }
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {record.anomalies && record.anomalies.length > 0
-                                ? record.anomalies.map((a) => a.description).join('; ')
-                                : 'None'}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
+                      {childLoading ? (
+                        <AttendanceTableSkeleton rows={5} />
+                      ) : attendance.length === 0 ? (
+                        <EmptyState icon="📅" title="No attendance records" description="Attendance will appear here once your child starts checking in." />
+                      ) : (
+                        <TableContainer>
+                          <Table>
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Date</TableCell>
+                                <TableCell>Check-In Time</TableCell>
+                                <TableCell>Check-Out Time</TableCell>
+                                <TableCell>Status</TableCell>
+                                <TableCell>Anomalies</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {attendance.slice(0, 10).map((record) => (
+                                <TableRow key={record.id}>
+                                  <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
+                                  <TableCell>{record.checkInTime || 'N/A'}</TableCell>
+                                  <TableCell>{record.checkOutTime || 'N/A'}</TableCell>
+                                  <TableCell>
+                                    <Chip
+                                      label={record.status}
+                                      size="small"
+                                      color={
+                                        record.status === 'present'
+                                          ? 'success'
+                                          : record.status === 'late'
+                                          ? 'warning'
+                                          : 'error'
+                                      }
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    {record.anomalies && record.anomalies.length > 0
+                                      ? record.anomalies.map((a) => a.description).join('; ')
+                                      : 'None'}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      )}
                 </Paper>
               </Grid>
 
@@ -493,14 +582,38 @@ export default function ParentDashboard() {
               )}
             </Grid>
           </>
+        ) : childrenLoading ? (
+          <SessionListSkeleton rows={2} />
+        ) : childrenError ? (
+          <EmptyState
+            variant="error"
+            icon="📋"
+            title="Couldn't load linked children"
+            description="Please try again in a moment."
+            actionLabel="Retry"
+            onAction={loadChildren}
+          />
+        ) : childDataError ? (
+          <EmptyState
+            variant="error"
+            icon="📋"
+            title="Couldn't load child dashboard"
+            description="Please select a child again or retry."
+            actionLabel="Retry"
+            onAction={() => selectedChild && loadChildData(selectedChild.id)}
+          />
         ) : (
-          <Paper sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="h6" color="text.secondary">
-              {children.length === 0
-                ? 'No children linked. Click "Link Child" to get started.'
-                : 'Select a child to view their dashboard'}
-            </Typography>
-          </Paper>
+          <EmptyState
+            icon="📋"
+            title={children.length === 0 ? 'No children linked' : 'No child selected'}
+            description={
+              children.length === 0
+                ? 'Link a child account to see their stats.'
+                : 'Select a child to view their dashboard.'
+            }
+            actionLabel="Link child"
+            onAction={() => setLinkDialog(true)}
+          />
         )}
       </Container>
 
@@ -514,10 +627,14 @@ export default function ParentDashboard() {
           <TextField
             fullWidth
             label="Child's Email"
+            name="studentEmail"
             type="email"
-            value={studentEmail}
-            onChange={(e) => setStudentEmail(e.target.value)}
+            value={linkForm.studentEmail}
+            onChange={handleLinkChange}
+            onBlur={handleLinkBlur}
             margin="normal"
+            error={Boolean(linkTouched.studentEmail && linkErrors.studentEmail)}
+            helperText={linkTouched.studentEmail ? linkErrors.studentEmail : ''}
           />
         </DialogContent>
         <DialogActions>
@@ -525,12 +642,14 @@ export default function ParentDashboard() {
           <Button
             variant="contained"
             onClick={handleLinkChild}
-            disabled={!studentEmail}
+            disabled={!linkForm.studentEmail}
           >
             Link Child
           </Button>
         </DialogActions>
       </Dialog>
+
+      {startTour && <TourEngine steps={resolvedTourSteps} refs={tourRefs} />}
     </Box>
   );
 }

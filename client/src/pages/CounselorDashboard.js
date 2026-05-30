@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getConfig } from '../config/appConfig';
 import {
   Box,
@@ -39,27 +39,39 @@ import {
   AccordionDetails,
 } from '@mui/material';
 import {
-  School,
   Logout,
   People,
   Psychology,
   Warning,
-  CheckCircle,
   Info,
   ExpandMore,
   Refresh,
-  Timeline,
   Class,
   Menu as MenuIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import { useSnackbar } from '../context/SnackbarContext';
 import api from '../services/api';
+import TourEngine from '../components/OnboardingTour/TourEngine';
+import { tourConfigs } from '../components/OnboardingTour/tourConfigs';
+import EmptyState from '../components/EmptyState';
+import StudentTableSkeleton from '../components/skeletons/StudentTableSkeleton';
+import DocumentCardSkeleton from '../components/skeletons/DocumentCardSkeleton';
 
 export default function CounselorDashboard() {
   const { user, logout } = useAuth();
+  const { show } = useSnackbar();
   const config = getConfig();
   const [tabValue, setTabValue] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [startTour, setStartTour] = useState(false);
+
+  const tourRefs = {
+    allStudentsTable: useRef(null),
+    studentDetailsAction: useRef(null),
+    orientationAction: useRef(null),
+    classroomsTab: useRef(null),
+  };
   
   // State
   const [students, setStudents] = useState([]);
@@ -67,8 +79,13 @@ export default function CounselorDashboard() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentDetails, setStudentDetails] = useState(null);
   const [orientationData, setOrientationData] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [classroomsLoading, setClassroomsLoading] = useState(false);
+  const [studentsError, setStudentsError] = useState(null);
+  const [classroomsError, setClassroomsError] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const onboardingCompleted = user?.onboardingCompleted;
+  const userId = user?.id;
   
   // Dialogs
   const [studentDialog, setStudentDialog] = useState(false);
@@ -84,56 +101,84 @@ export default function CounselorDashboard() {
     loadClassrooms();
   }, []);
 
+  useEffect(() => {
+    if (!userId || onboardingCompleted) return;
+    if (students.length === 0) return;
+    const timer = setTimeout(() => setStartTour(true), 800);
+    return () => clearTimeout(timer);
+  }, [userId, onboardingCompleted, students.length]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const refKey = e?.detail?.refKey;
+      if (!refKey) return;
+
+      if (refKey === 'classroomsTab') setTabValue(1);
+      if (refKey === 'allStudentsTable' || refKey === 'studentDetailsAction' || refKey === 'orientationAction') {
+        setTabValue(0);
+      }
+    };
+
+    window.addEventListener('scholarai:onboarding-tour-step', handler);
+    return () => window.removeEventListener('scholarai:onboarding-tour-step', handler);
+  }, []);
+
   const loadStudents = async () => {
     try {
-      setLoading(true);
+      setStudentsLoading(true);
+      setStudentsError(null);
       const res = await api.get('/counselor/students');
       setStudents(res.data.students);
     } catch (error) {
       console.error('Failed to load students:', error);
+      setStudentsError(error);
+      show('Failed to load students', 'error');
     } finally {
-      setLoading(false);
+      setStudentsLoading(false);
     }
   };
 
   const loadClassrooms = async () => {
     try {
-      setLoading(true);
+      setClassroomsLoading(true);
+      setClassroomsError(null);
       const res = await api.get('/counselor/classrooms');
       setClassrooms(res.data.classrooms);
     } catch (error) {
       console.error('Failed to load classrooms:', error);
+      setClassroomsError(error);
+      show('Failed to load classrooms', 'error');
     } finally {
-      setLoading(false);
+      setClassroomsLoading(false);
     }
   };
 
   const loadStudentDetails = async (studentId) => {
     try {
-      setLoading(true);
+      setStudentsLoading(true);
       const res = await api.get(`/counselor/students/${studentId}`);
       setStudentDetails(res.data);
       setStudentDialog(true);
     } catch (error) {
       console.error('Failed to load student details:', error);
-      alert('Failed to load student details');
+      show('Failed to load student details', 'error');
     } finally {
-      setLoading(false);
+      setStudentsLoading(false);
     }
   };
 
   const loadOrientationData = async (studentId) => {
     try {
-      setLoading(true);
+      setStudentsLoading(true);
       const res = await api.get(`/counselor/students/${studentId}/orientation`);
       setOrientationData(res.data);
       setSelectedStudent(studentId);
       setOrientationDialog(true);
     } catch (error) {
       console.error('Failed to load orientation data:', error);
-      alert('Failed to load orientation data');
+      show('Failed to load orientation data', 'error');
     } finally {
-      setLoading(false);
+      setStudentsLoading(false);
     }
   };
 
@@ -142,13 +187,13 @@ export default function CounselorDashboard() {
     
     try {
       setAnalyzing(true);
-      const res = await api.post(`/counselor/students/${selectedStudent}/orientation/analyze`);
-      alert('Orientation analysis completed successfully!');
+      await api.post(`/counselor/students/${selectedStudent}/orientation/analyze`);
+      show('Orientation analysis completed successfully!', 'success');
       // Reload orientation data
       await loadOrientationData(selectedStudent);
     } catch (error) {
       console.error('Failed to trigger analysis:', error);
-      alert('Failed to trigger orientation analysis');
+      show('Failed to trigger orientation analysis', 'error');
     } finally {
       setAnalyzing(false);
     }
@@ -223,7 +268,12 @@ export default function CounselorDashboard() {
               }}
             >
               {counselorTabs.map((tab) => (
-                <Tab key={tab.label} label={tab.label} icon={tab.icon} />
+                <Tab
+                  key={tab.label}
+                  label={tab.label}
+                  icon={tab.icon}
+                  ref={tab.label === 'Classrooms' ? tourRefs.classroomsTab : null}
+                />
               ))}
             </Tabs>
           </Box>
@@ -274,7 +324,7 @@ export default function CounselorDashboard() {
           </Paper>
 
           {tabValue === 0 && (
-            <Paper elevation={3} sx={{ p: 3 }}>
+            <Paper ref={tourRefs.allStudentsTable} elevation={3} sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                 <Typography variant="h5">All Students</Typography>
                 <Button variant="outlined" startIcon={<Refresh />} onClick={loadStudents}>
@@ -282,10 +332,23 @@ export default function CounselorDashboard() {
                 </Button>
               </Box>
               
-              {loading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                  <CircularProgress />
-                </Box>
+              {studentsLoading ? (
+                <StudentTableSkeleton rows={5} cols={5} />
+              ) : studentsError ? (
+                <EmptyState
+                  variant="error"
+                  icon="👥"
+                  title="Couldn't load students"
+                  description="Please try refreshing in a moment."
+                  actionLabel="Refresh"
+                  onAction={loadStudents}
+                />
+              ) : students.length === 0 ? (
+                <EmptyState
+                  icon="👥"
+                  title="No students assigned"
+                  description="Students assigned to you will appear here."
+                />
               ) : (
                 <TableContainer>
                   <Table>
@@ -294,36 +357,47 @@ export default function CounselorDashboard() {
                         <TableCell>Name</TableCell>
                         <TableCell>Email</TableCell>
                         <TableCell>Grade</TableCell>
+                        <TableCell>Classroom</TableCell>
                         <TableCell>Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {students.map((student) => (
-                        <TableRow key={student.id}>
-                          <TableCell>{student.firstName} {student.lastName}</TableCell>
-                          <TableCell>{student.email}</TableCell>
-                          <TableCell>{student.grade || 'N/A'}</TableCell>
-                          <TableCell>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              onClick={() => loadStudentDetails(student.id)}
-                              sx={{ mr: 1 }}
-                            >
-                              View Details
-                            </Button>
-                            <Button
-                              size="small"
-                              variant="contained"
-                              color="primary"
-                              startIcon={<Psychology />}
-                              onClick={() => loadOrientationData(student.id)}
-                            >
-                              Orientation
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {students.map((student, index) => {
+                        const studentClassrooms = classrooms
+                          .filter(c => c.students?.some(s => s.id === student.id))
+                          .map(c => c.name)
+                          .join(', ') || 'Not assigned';
+
+                        return (
+                          <TableRow key={student.id}>
+                            <TableCell>{student.firstName} {student.lastName}</TableCell>
+                            <TableCell>{student.email}</TableCell>
+                            <TableCell>{student.grade || 'N/A'}</TableCell>
+                            <TableCell>{studentClassrooms}</TableCell>
+                            <TableCell>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => loadStudentDetails(student.id)}
+                                sx={{ mr: 1 }}
+                                ref={index === 0 ? tourRefs.studentDetailsAction : null}
+                              >
+                                View Details
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                color="primary"
+                                startIcon={<Psychology />}
+                                onClick={() => loadOrientationData(student.id)}
+                                ref={index === 0 ? tourRefs.orientationAction : null}
+                              >
+                                Orientation
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </TableContainer>
@@ -340,17 +414,29 @@ export default function CounselorDashboard() {
                 </Button>
               </Box>
               
-              {loading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                  <CircularProgress />
-                </Box>
-              ) : students.length === 0 ? (
-                <Alert severity="info">No students found.</Alert>
-              ) : (
-                <Box>
-                  <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-                    All Students ({students.length})
-                  </Typography>
+              <Box>
+                <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                  All Students
+                </Typography>
+
+                {studentsLoading ? (
+                  <StudentTableSkeleton rows={5} cols={5} />
+                ) : studentsError ? (
+                  <EmptyState
+                    variant="error"
+                    icon="👥"
+                    title="Couldn't load students"
+                    description="Please try refreshing in a moment."
+                    actionLabel="Refresh"
+                    onAction={loadStudents}
+                  />
+                ) : students.length === 0 ? (
+                  <EmptyState
+                    icon="👥"
+                    title="No students assigned"
+                    description="Students assigned to you will appear here."
+                  />
+                ) : (
                   <TableContainer>
                     <Table>
                       <TableHead>
@@ -364,17 +450,15 @@ export default function CounselorDashboard() {
                       </TableHead>
                       <TableBody>
                         {students.map((student) => {
-                          // Find which classroom(s) this student belongs to
                           const studentClassrooms = classrooms
                             .filter(c => c.students?.some(s => s.id === student.id))
                             .map(c => c.name)
                             .join(', ') || 'Not assigned';
-                          
-                          // Get classroom IDs for this student for highlighting
+
                           const studentClassroomIds = classrooms
                             .filter(c => c.students?.some(s => s.id === student.id))
                             .map(c => c.id);
-                          
+
                           return (
                             <TableRow 
                               key={student.id}
@@ -409,74 +493,90 @@ export default function CounselorDashboard() {
                       </TableBody>
                     </Table>
                   </TableContainer>
-                  
-                  {classrooms.length > 0 && (
-                    <Box sx={{ mt: 4 }}>
-                      <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-                        Classrooms Overview
-                      </Typography>
-                      <Grid container spacing={3}>
-                        {classrooms.map((classroom) => (
-                          <Grid item xs={12} md={6} lg={4} key={classroom.id}>
-                            <Card 
-                              sx={{ 
-                                cursor: 'pointer',
-                                transition: 'all 0.3s ease',
-                                '&:hover': {
-                                  transform: 'translateY(-4px)',
-                                  boxShadow: 6
-                                }
-                              }}
-                              onClick={() => {
-                                // Scroll to students table and highlight this classroom's students
-                                const studentRows = document.querySelectorAll(`[data-classroom-id="${classroom.id}"]`);
-                                if (studentRows.length > 0) {
-                                  studentRows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                  // Highlight the row temporarily
-                                  studentRows.forEach(row => {
-                                    row.style.backgroundColor = '#e3f2fd';
-                                    setTimeout(() => {
-                                      row.style.backgroundColor = '';
-                                    }, 2000);
-                                  });
-                                }
-                              }}
-                            >
-                              <CardContent>
-                                <Typography variant="h6" gutterBottom>
-                                  {classroom.name}
-                                </Typography>
+                )}
+
+                <Box sx={{ mt: 4 }}>
+                  <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                    Classrooms Overview
+                  </Typography>
+
+                  {classroomsLoading ? (
+                    <DocumentCardSkeleton count={2} />
+                  ) : classroomsError ? (
+                    <EmptyState
+                      variant="error"
+                      icon="🏫"
+                      title="Couldn't load classrooms"
+                      description="Please try refreshing in a moment."
+                      actionLabel="Refresh"
+                      onAction={loadClassrooms}
+                    />
+                  ) : classrooms.length === 0 ? (
+                    <EmptyState
+                      icon="🏫"
+                      title="No classrooms"
+                      description="No classroom data is available."
+                    />
+                  ) : (
+                    <Grid container spacing={3}>
+                      {classrooms.map((classroom) => (
+                        <Grid item xs={12} md={6} lg={4} key={classroom.id}>
+                          <Card 
+                            sx={{ 
+                              cursor: 'pointer',
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                transform: 'translateY(-4px)',
+                                boxShadow: 6
+                              }
+                            }}
+                            onClick={() => {
+                              const studentRows = document.querySelectorAll(`[data-classroom-id="${classroom.id}"]`);
+                              if (studentRows.length > 0) {
+                                studentRows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                studentRows.forEach(row => {
+                                  row.style.backgroundColor = '#e3f2fd';
+                                  setTimeout(() => {
+                                    row.style.backgroundColor = '';
+                                  }, 2000);
+                                });
+                              }
+                            }}
+                          >
+                            <CardContent>
+                              <Typography variant="h6" gutterBottom>
+                                {classroom.name}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary" gutterBottom>
+                                Grade: {classroom.grade}
+                              </Typography>
+                              {classroom.teachers && classroom.teachers.length > 0 ? (
                                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                                  Grade: {classroom.grade}
+                                  Teachers: {classroom.teachers.map(t => `${t.firstName} ${t.lastName}`).join(', ')}
                                 </Typography>
-                                {classroom.teachers && classroom.teachers.length > 0 ? (
-                                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                                    Teachers: {classroom.teachers.map(t => `${t.firstName} ${t.lastName}`).join(', ')}
-                                  </Typography>
-                                ) : (
-                                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                                    Teachers: Not assigned
-                                  </Typography>
-                                )}
+                              ) : (
                                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                                  Students: {classroom.students?.length || 0}
+                                  Teachers: Not assigned
                                 </Typography>
-                                {classroom.subjects && classroom.subjects.length > 0 && (
-                                  <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                    {classroom.subjects.map((subject, idx) => (
-                                      <Chip key={idx} label={subject} size="small" />
-                                    ))}
-                                  </Box>
-                                )}
-                              </CardContent>
-                            </Card>
-                          </Grid>
-                        ))}
-                      </Grid>
-                    </Box>
+                              )}
+                              <Typography variant="body2" color="text.secondary" gutterBottom>
+                                Students: {classroom.students?.length || 0}
+                              </Typography>
+                              {classroom.subjects && classroom.subjects.length > 0 && (
+                                <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                  {classroom.subjects.map((subject, idx) => (
+                                    <Chip key={idx} label={subject} size="small" />
+                                  ))}
+                                </Box>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      ))}
+                    </Grid>
                   )}
                 </Box>
-              )}
+              </Box>
             </Paper>
           )}
         </Container>
@@ -699,6 +799,8 @@ export default function CounselorDashboard() {
           <Button onClick={() => setOrientationDialog(false)}>Close</Button>
         </DialogActions>
       </Dialog>
+
+      {startTour && <TourEngine steps={tourConfigs.counselor} refs={tourRefs} />}
     </Box>
   );
 }

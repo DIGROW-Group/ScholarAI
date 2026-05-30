@@ -3,24 +3,26 @@ const { User } = require('../database/models');
 
 const auth = async (req, res, next) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const token = req.cookies?.access_token;
 
     if (!token) {
-      throw new Error();
+      return res.status(401).json({ code: 'INVALID_TOKEN', error: 'Please authenticate' });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findByPk(decoded.id);
+    const user = await User.findByPk(decoded.sub);
 
     if (!user) {
-      throw new Error();
+      return res.status(401).json({ code: 'INVALID_TOKEN', error: 'Please authenticate' });
     }
 
     req.user = user;
-    req.token = token;
     next();
   } catch (error) {
-    res.status(401).json({ error: 'Please authenticate' });
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ code: 'TOKEN_EXPIRED', error: 'Token expired' });
+    }
+    return res.status(401).json({ code: 'INVALID_TOKEN', error: 'Please authenticate' });
   }
 };
 

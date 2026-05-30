@@ -11,9 +11,9 @@ import {
   Alert,
   MenuItem,
 } from '@mui/material';
-import { School } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { getConfig } from '../config/appConfig';
+import useForm from '../hooks/useForm';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -36,27 +36,49 @@ export default function Register() {
     setLogoUrl(newUrl);
   }, [config.logoImage, config.name]);
   
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    firstName: '',
-    lastName: '',
-    role: 'student',
-    grade: '',
-    subjects: [],
-  });
+  const validateRegister = (values) => {
+    const errors = {};
+    if (!values.firstName?.trim()) errors.firstName = 'First name is required';
+    if (!values.lastName?.trim()) errors.lastName = 'Last name is required';
+    if (!values.email?.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) {
+      errors.email = 'Enter a valid email address';
+    }
+    if (!values.role) errors.role = 'Role is required';
+    if (values.role === 'student' && !values.grade) errors.grade = 'Grade is required for students';
+    if (!values.password) {
+      errors.password = 'Password is required';
+    } else if (values.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
+    }
+    if (!values.confirmPassword) {
+      errors.confirmPassword = 'Please confirm your password';
+    } else if (values.password !== values.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+    if (values.role === 'teacher' && (!values.subjects || values.subjects.length === 0)) {
+      errors.subjects = 'Teachers must select at least one subject';
+    }
+    return errors;
+  };
+
+  const { values, errors, touched, handleChange, handleBlur, submit } = useForm(
+    {
+      email: '',
+      password: '',
+      confirmPassword: '',
+      firstName: '',
+      lastName: '',
+      role: 'student',
+      grade: '',
+      subjects: [],
+    },
+    validateRegister
+  );
   
   console.log('Register render - Current logoUrl:', logoUrl, 'Config logo:', config.logoImage, 'Config name:', config.name);
 
-  const availableSubjects = [
-    { id: 'math', label: 'Maths', icon: '📐' },
-    { id: 'physics', label: 'Physics', icon: '⚛️' },
-    { id: 'arabic', label: 'Arabic', icon: '🇲🇦' },
-    { id: 'english', label: 'English', icon: '🇬🇧' },
-    { id: 'french', label: 'French', icon: '🇫🇷' },
-    { id: 'informatique', label: 'IT', icon: '💻' },
-  ];
   const [error, setError] = useState('');
   const [errorDetails, setErrorDetails] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -66,26 +88,27 @@ export default function Register() {
     setError('');
     setErrorDetails([]);
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    setLoading(true);
-
-    const { confirmPassword, ...userData } = formData;
-    const result = await register(userData);
-    
-    if (result.success) {
-      navigate('/');
-    } else {
-      setError(result.error || 'Registration failed');
-      if (Array.isArray(result.details)) {
-        setErrorDetails(result.details);
+    const submitted = await submit(async (formValues) => {
+      setLoading(true);
+      try {
+        const { confirmPassword, ...userData } = formValues;
+        const result = await register(userData);
+        if (result.success) {
+          navigate('/');
+        } else {
+          setError(result.error || 'Registration failed');
+          if (Array.isArray(result.details)) {
+            setErrorDetails(result.details);
+          }
+        }
+      } finally {
+        setLoading(false);
       }
+    });
+
+    if (!submitted) {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   return (
@@ -189,52 +212,71 @@ export default function Register() {
             <TextField
               fullWidth
               label="First Name"
+              name="firstName"
               margin="normal"
-              value={formData.firstName}
-              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+              value={values.firstName}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              error={Boolean(touched.firstName && errors.firstName)}
+              helperText={touched.firstName ? errors.firstName : ''}
               required
               autoFocus
             />
             <TextField
               fullWidth
               label="Last Name"
+              name="lastName"
               margin="normal"
-              value={formData.lastName}
-              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+              value={values.lastName}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              error={Boolean(touched.lastName && errors.lastName)}
+              helperText={touched.lastName ? errors.lastName : ''}
               required
             />
             <TextField
               fullWidth
               label="Email"
+              name="email"
               type="email"
               margin="normal"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              value={values.email}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              error={Boolean(touched.email && errors.email)}
+              helperText={touched.email ? errors.email : ''}
               required
             />
             <TextField
               fullWidth
               select
               label="Role"
+              name="role"
               margin="normal"
-              value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+              value={values.role}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              error={Boolean(touched.role && errors.role)}
+              helperText={touched.role ? errors.role : ''}
               required
               helperText="Self-service registration is available for students and parents only"
             >
               <MenuItem value="student">Student</MenuItem>
               <MenuItem value="parent">Parent</MenuItem>
             </TextField>
-            {formData.role === 'student' && (
+            {values.role === 'student' && (
               <TextField
                 fullWidth
                 select
                 label="Grade"
+                name="grade"
                 margin="normal"
-                value={formData.grade}
-                onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                value={values.grade}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                error={Boolean(touched.grade && errors.grade)}
+                helperText={touched.grade ? errors.grade : 'Select your current grade level'}
                 required
-                helperText="Select your current grade level"
               >
                 <MenuItem value="1ere College">1ère Collège</MenuItem>
                 <MenuItem value="2eme College">2ème Collège</MenuItem>
@@ -248,19 +290,27 @@ export default function Register() {
             <TextField
               fullWidth
               label="Password"
+              name="password"
               type="password"
               margin="normal"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              value={values.password}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              error={Boolean(touched.password && errors.password)}
+              helperText={touched.password ? errors.password : ''}
               required
             />
             <TextField
               fullWidth
               label="Confirm Password"
+              name="confirmPassword"
               type="password"
               margin="normal"
-              value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              value={values.confirmPassword}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              error={Boolean(touched.confirmPassword && errors.confirmPassword)}
+              helperText={touched.confirmPassword ? errors.confirmPassword : ''}
               required
             />
             <Button

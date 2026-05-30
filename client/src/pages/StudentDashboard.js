@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getConfig } from '../config/appConfig';
 import {
   Box,
@@ -32,42 +32,60 @@ import {
   Tabs,
 } from '@mui/material';
 import {
-  School,
   Logout,
   Send,
   CheckCircle,
   Schedule,
   TrendingUp,
   Lightbulb,
+  School,
   Login as LoginIcon,
   LogoutOutlined,
   Menu as MenuIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import { useSnackbar } from '../context/SnackbarContext';
 import api from '../services/api';
+import TourEngine from '../components/OnboardingTour/TourEngine';
+import { tourConfigs } from '../components/OnboardingTour/tourConfigs';
+import SessionListSkeleton from '../components/skeletons/SessionListSkeleton';
+import StatCardSkeleton from '../components/skeletons/StatCardSkeleton';
+import EmptyState from '../components/EmptyState';
+
+const SUBJECTS = [
+  { id: 'math', label: 'Maths', icon: '📐' },
+  { id: 'physics', label: 'Physics', icon: '⚛️' },
+  { id: 'arabic', label: 'Arabic', icon: '🇲🇦' },
+  { id: 'english', label: 'English', icon: '🇬🇧' },
+  { id: 'french', label: 'French', icon: '🇫🇷' },
+  { id: 'informatique', label: 'IT', icon: '💻' },
+];
 
 export default function StudentDashboard() {
   const { user, logout } = useAuth();
+  const { show } = useSnackbar();
   const config = getConfig();
   const [tabValue, setTabValue] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [startTour, setStartTour] = useState(false);
+
+  const tourRefs = {
+    appBarTabs: useRef(null),
+    attendancePanel: useRef(null),
+    alertBanners: useRef(null),
+    aiTutorChat: useRef(null),
+    subjectChips: useRef(null),
+    masteryBars: useRef(null),
+  };
   
   // Tutor state
   const [subject, setSubject] = useState('math');
   const [question, setQuestion] = useState('');
-  
-  // All available subjects
-  const subjects = [
-    { id: 'math', label: 'Maths', icon: '📐' },
-    { id: 'physics', label: 'Physics', icon: '⚛️' },
-    { id: 'arabic', label: 'Arabic', icon: '🇲🇦' },
-    { id: 'english', label: 'English', icon: '🇬🇧' },
-    { id: 'french', label: 'French', icon: '🇫🇷' },
-    { id: 'informatique', label: 'IT', icon: '💻' },
-  ];
   const [sessionId, setSessionId] = useState(null);
   const [conversation, setConversation] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [dashboardError, setDashboardError] = useState(null);
   const [feedbackDialog, setFeedbackDialog] = useState(false);
   const [rating, setRating] = useState(5);
   const [outcome, setOutcome] = useState('solved');
@@ -79,19 +97,18 @@ export default function StudentDashboard() {
   const [attendance, setAttendance] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [availableSubjects, setAvailableSubjects] = useState([]);
+  const onboardingCompleted = user?.onboardingCompleted;
+  const userId = user?.id;
 
   const studentTabs = [
     { label: 'AI Tutor', icon: <Lightbulb /> },
     { label: 'My Progress', icon: <TrendingUp /> },
     { label: 'Orientation', icon: <School /> },
   ];
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
+      setDashboardLoading(true);
+      setDashboardError(null);
       const [progressRes, sessionsRes, attendanceRes, alertsRes] = await Promise.all([
         api.get('/student/progress'),
         api.get('/tutor/sessions?limit=10'),
@@ -103,14 +120,28 @@ export default function StudentDashboard() {
       setSessions(sessionsRes.data.sessions);
       setAttendance(attendanceRes.data.attendance);
       setAlerts(alertsRes.data.alerts);
-      setAvailableSubjects(progressRes.data.availableSubjects || subjects.map(s => s.id));
+      setAvailableSubjects(progressRes.data.availableSubjects || SUBJECTS.map(s => s.id));
     } catch (error) {
       console.error('Failed to load data:', error);
+      setDashboardError(error);
+      show('Failed to load dashboard data', 'error');
+    } finally {
+      setDashboardLoading(false);
     }
-  };
+  }, [show]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    if (!userId || onboardingCompleted) return;
+    const timer = setTimeout(() => setStartTour(true), 800);
+    return () => clearTimeout(timer);
+  }, [userId, onboardingCompleted]);
 
   // Filter subjects based on classroom availability
-  const filteredSubjects = subjects.filter(s => availableSubjects.includes(s.id));
+  const filteredSubjects = SUBJECTS.filter(s => availableSubjects.includes(s.id));
 
   const loadOrientation = async () => {
     try {
@@ -146,6 +177,7 @@ export default function StudentDashboard() {
       setQuestion('');
     } catch (error) {
       console.error('Failed to ask question:', error);
+      show(error.response?.data?.error || 'Failed to ask question', 'error');
     }
     setLoading(false);
   };
@@ -161,8 +193,10 @@ export default function StudentDashboard() {
       setSessionId(null);
       setConversation([]);
       loadData();
+      show('Feedback submitted successfully!', 'success');
     } catch (error) {
       console.error('Failed to submit feedback:', error);
+      show('Failed to submit feedback', 'error');
     }
   };
 
@@ -170,9 +204,10 @@ export default function StudentDashboard() {
     try {
       await api.post('/student/checkin', {});
       loadData();
-      alert('Checked in successfully!');
+      show('Checked in successfully!', 'success');
     } catch (error) {
       console.error('Check-in failed:', error);
+      show(error.response?.data?.error || 'Check-in failed', 'error');
     }
   };
 
@@ -180,10 +215,10 @@ export default function StudentDashboard() {
     try {
       await api.post('/student/checkout', {});
       loadData();
-      alert('Checked out successfully!');
+      show('Checked out successfully!', 'success');
     } catch (error) {
       console.error('Check-out failed:', error);
-      alert(error.response?.data?.error || 'Check-out failed');
+      show(error.response?.data?.error || 'Check-out failed', 'error');
     }
   };
 
@@ -213,6 +248,7 @@ export default function StudentDashboard() {
             </Box>
           <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
             <Tabs 
+              ref={tourRefs.appBarTabs}
               value={tabValue} 
               onChange={(e, v) => setTabValue(v)} 
               sx={{ 
@@ -233,7 +269,7 @@ export default function StudentDashboard() {
               }}
             >
               {studentTabs.map((tab) => (
-                <Tab key={tab.label} label={tab.label} />
+                <Tab key={tab.label} label={tab.label} icon={tab.icon} iconPosition="start" />
               ))}
             </Tabs>
           </Box>
@@ -274,7 +310,7 @@ export default function StudentDashboard() {
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
         {/* Attendance Section */}
-        <Paper sx={{ mb: 3, p: 2 }}>
+        <Paper ref={tourRefs.attendancePanel} sx={{ mb: 3, p: 2 }}>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} md={6}>
               <Typography variant="h6" gutterBottom>
@@ -309,9 +345,20 @@ export default function StudentDashboard() {
         </Paper>
 
         {/* Alerts */}
-        {alerts.length > 0 && (
-          <Box sx={{ mb: 3 }}>
-            {alerts.slice(0, 3).map((alert) => (
+        <Box ref={tourRefs.alertBanners} sx={{ mb: 3 }}>
+          {dashboardLoading ? (
+            <SessionListSkeleton rows={2} />
+          ) : dashboardError ? (
+            <EmptyState
+              variant="error"
+              icon="✅"
+              title="Couldn't load alerts"
+              description="Please try again in a moment."
+              actionLabel="Retry"
+              onAction={loadData}
+            />
+          ) : alerts.length > 0 ? (
+            alerts.slice(0, 3).map((alert) => (
               <Alert
                 key={alert.id}
                 severity={alert.severity}
@@ -319,21 +366,27 @@ export default function StudentDashboard() {
               >
                 <strong>{alert.title}</strong>: {alert.message}
               </Alert>
-            ))}
-          </Box>
-        )}
+            ))
+          ) : (
+            <EmptyState
+              icon="✅"
+              title="No alerts"
+              description="You're all caught up."
+            />
+          )}
+        </Box>
 
         {/* Tab 0: AI Tutor */}
         {tabValue === 0 && (
           <Grid container spacing={3}>
             <Grid item xs={12} md={8}>
-              <Paper sx={{ p: 3, minHeight: 500 }}>
+              <Paper ref={tourRefs.aiTutorChat} sx={{ p: 3, minHeight: 500 }}>
                 <Typography variant="h6" gutterBottom>AI Tutor Q&A</Typography>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
                   Select a subject and ask your question
                 </Typography>
                 
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, my: 2 }}>
+                <Box ref={tourRefs.subjectChips} sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, my: 2 }}>
                   {filteredSubjects.length === 0 && (
                     <Alert severity="warning" sx={{ width: '100%' }}>
                       No subjects available. Please contact your teacher or admin to be assigned to a classroom.
@@ -358,7 +411,7 @@ export default function StudentDashboard() {
                   {conversation.length === 0 ? (
                     <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
                       {filteredSubjects.length > 0 
-                        ? `Ask a question to get started with ${subjects.find(s => s.id === subject)?.label} tutoring!`
+                        ? `Ask a question to get started with ${SUBJECTS.find(s => s.id === subject)?.label} tutoring!`
                         : 'Please contact your teacher to be assigned to a classroom.'}
                     </Typography>
                   ) : (
@@ -429,27 +482,65 @@ export default function StudentDashboard() {
                 <Typography variant="h6" gutterBottom>
                   Recent Sessions
                 </Typography>
-                <List dense>
-                  {sessions.slice(0, 5).map((session) => (
-                    <ListItem key={session.id}>
-                      <ListItemText
-                        primary={session.subject.toUpperCase()}
-                        secondary={`${session.outcome} - ${new Date(session.createdAt).toLocaleDateString()}`}
-                      />
-                      {session.studentRating && (
-                        <Chip label={`★ ${session.studentRating}`} size="small" />
-                      )}
-                    </ListItem>
-                  ))}
-                </List>
+                {dashboardLoading ? (
+                  <SessionListSkeleton rows={4} />
+                ) : dashboardError ? (
+                  <EmptyState
+                    variant="error"
+                    icon="💬"
+                    title="Couldn't load sessions"
+                    description="Please try again in a moment."
+                    actionLabel="Retry"
+                    onAction={loadData}
+                  />
+                ) : sessions.length === 0 ? (
+                  <EmptyState
+                    icon="💬"
+                    title="No sessions yet"
+                    description="Ask your AI tutor a question to get started."
+                    actionLabel="Ask a question"
+                    onAction={() => setTabValue(0)}
+                  />
+                ) : (
+                  <List dense>
+                    {sessions.slice(0, 5).map((session) => (
+                      <ListItem key={session.id}>
+                        <ListItemText
+                          primary={session.subject.toUpperCase()}
+                          secondary={`${session.outcome} - ${new Date(session.createdAt).toLocaleDateString()}`}
+                        />
+                        {session.studentRating && (
+                          <Chip label={`★ ${session.studentRating}`} size="small" />
+                        )}
+                      </ListItem>
+                    ))}
+                  </List>
+                )}
               </Paper>
 
-              {progress && (
-                <Paper sx={{ p: 2 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Mastery Levels
-                  </Typography>
-                  {Object.entries(progress.masteryLevels).map(([subject, level]) => (
+              <Paper ref={tourRefs.masteryBars} sx={{ p: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Mastery Levels
+                </Typography>
+                {dashboardLoading ? (
+                  <StatCardSkeleton />
+                ) : dashboardError ? (
+                  <EmptyState
+                    variant="error"
+                    icon="📊"
+                    title="Couldn't load progress"
+                    description="Please try again in a moment."
+                    actionLabel="Retry"
+                    onAction={loadData}
+                  />
+                ) : !progress || Object.keys(progress.masteryLevels || {}).length === 0 ? (
+                  <EmptyState
+                    icon="📊"
+                    title="No progress data yet"
+                    description="Complete some tutoring sessions to see your mastery levels."
+                  />
+                ) : (
+                  Object.entries(progress.masteryLevels).map(([subject, level]) => (
                     <Box key={subject} sx={{ mb: 2 }}>
                       <Typography variant="body2">{subject.toUpperCase()}</Typography>
                       <LinearProgress
@@ -459,9 +550,9 @@ export default function StudentDashboard() {
                       />
                       <Typography variant="caption">{(level * 100).toFixed(0)}%</Typography>
                     </Box>
-                  ))}
-                </Paper>
-              )}
+                  ))
+                )}
+              </Paper>
             </Grid>
           </Grid>
         )}
@@ -612,6 +703,8 @@ export default function StudentDashboard() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {startTour && <TourEngine steps={tourConfigs.student} refs={tourRefs} />}
     </Box>
   );
 }

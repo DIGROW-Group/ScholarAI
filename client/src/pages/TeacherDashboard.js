@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getConfig } from '../config/appConfig';
 import {
   Box,
@@ -37,7 +37,6 @@ import {
   Alert,
 } from '@mui/material';
 import {
-  School,
   Logout,
   Upload,
   People,
@@ -47,15 +46,35 @@ import {
   Visibility,
   Menu as MenuIcon,
 } from '@mui/icons-material';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../context/AuthContext';
+import { useSnackbar } from '../context/SnackbarContext';
 import api from '../services/api';
+import TourEngine from '../components/OnboardingTour/TourEngine';
+import { tourConfigs } from '../components/OnboardingTour/tourConfigs';
+import StudentTableSkeleton from '../components/skeletons/StudentTableSkeleton';
+import DocumentCardSkeleton from '../components/skeletons/DocumentCardSkeleton';
+import SessionListSkeleton from '../components/skeletons/SessionListSkeleton';
+import EmptyState from '../components/EmptyState';
+import useForm from '../hooks/useForm';
 
 export default function TeacherDashboard() {
   const { user, logout } = useAuth();
+  const { show } = useSnackbar();
   const config = getConfig();
   const [tabValue, setTabValue] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [startTour, setStartTour] = useState(false);
+  const onboardingCompleted = user?.onboardingCompleted;
+  const userId = user?.id;
+
+  const tourRefs = {
+    studentsTable: useRef(null),
+    aiTutorsTab: useRef(null),
+    contentLibrary: useRef(null),
+    uploadButton: useRef(null),
+    analyticsTab: useRef(null),
+  };
   
   // State
   const [students, setStudents] = useState([]);
@@ -63,7 +82,11 @@ export default function TeacherDashboard() {
   const [analytics, setAnalytics] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentSessions, setStudentSessions] = useState([]);
+  const [subjectSessions, setSubjectSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [subjectSessionsLoading, setSubjectSessionsLoading] = useState(false);
+  const [subjectSessionsError, setSubjectSessionsError] = useState(null);
   
   // Dialogs
   const [uploadDialog, setUploadDialog] = useState(false);
@@ -71,14 +94,33 @@ export default function TeacherDashboard() {
   const [evaluationDialog, setEvaluationDialog] = useState(false);
   
   // Upload form
-  const [uploadForm, setUploadForm] = useState({
-    subject: 'math',
-    title: '',
-    description: '',
-    chapter: '',
-    guidelines: '',
-    file: null,
-  });
+  const validateUploadForm = (values) => {
+    const errors = {};
+    if (!values.subject) errors.subject = 'Subject is required';
+    if (!values.title?.trim()) errors.title = 'Title is required';
+    if (!values.file) errors.file = 'Please select a file';
+    return errors;
+  };
+
+  const {
+    values: uploadForm,
+    errors: uploadErrors,
+    touched: uploadTouched,
+    handleChange: handleUploadChange,
+    handleBlur: handleUploadBlur,
+    submit: submitUpload,
+    setValues: setUploadForm,
+  } = useForm(
+    {
+      subject: 'math',
+      title: '',
+      description: '',
+      chapter: '',
+      guidelines: '',
+      file: null,
+    },
+    validateUploadForm
+  );
   
   // Filter state
   const [subjectFilter, setSubjectFilter] = useState('all');
@@ -114,8 +156,39 @@ export default function TeacherDashboard() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (!userId || onboardingCompleted) return;
+    const timer = setTimeout(() => setStartTour(true), 800);
+    return () => clearTimeout(timer);
+  }, [userId, onboardingCompleted]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const refKey = e?.detail?.refKey;
+      if (!refKey) return;
+
+      if (refKey === 'studentsTable') setTabValue(0);
+      if (refKey === 'aiTutorsTab') setTabValue(1);
+      if (refKey === 'contentLibrary' || refKey === 'uploadButton') setTabValue(2);
+      if (refKey === 'analyticsTab') setTabValue(3);
+    };
+
+    window.addEventListener('scholarai:onboarding-tour-step', handler);
+    return () => window.removeEventListener('scholarai:onboarding-tour-step', handler);
+  }, []);
+
+  useEffect(() => {
+    if (tabValue === 1 && subjectFilter !== 'all') {
+      loadSubjectSessions(subjectFilter);
+    } else if (tabValue === 1) {
+      setSubjectSessions([]);
+      setSubjectSessionsError(null);
+    }
+  }, [tabValue, subjectFilter]);
+
   const loadData = async () => {
     try {
+      setLoading(true);
       const [studentsRes, documentsRes, analyticsRes] = await Promise.all([
         api.get('/teacher/students'),
         api.get('/teacher/documents'),
@@ -127,31 +200,52 @@ export default function TeacherDashboard() {
       setAnalytics(analyticsRes.data.analytics);
     } catch (error) {
       console.error('Failed to load data:', error);
+      show('Failed to load dashboard data', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSubjectSessions = async (subjectId) => {
+    try {
+      setSubjectSessionsLoading(true);
+      setSubjectSessionsError(null);
+      const res = await api.get(`/teacher/sessions/subject/${subjectId}?limit=20`);
+      setSubjectSessions(res.data.sessions || []);
+    } catch (error) {
+      console.error('Failed to load subject sessions:', error);
+      setSubjectSessionsError(error);
+      show('Failed to load sessions for this subject', 'error');
+    } finally {
+      setSubjectSessionsLoading(false);
     }
   };
 
   const handleUploadDocument = async () => {
-    try {
-      const formData = new FormData();
-      formData.append('subject', uploadForm.subject);
-      formData.append('title', uploadForm.title);
-      formData.append('description', uploadForm.description);
-      formData.append('chapter', uploadForm.chapter);
-      formData.append('guidelines', uploadForm.guidelines);
-      formData.append('document', uploadForm.file);
+    await submitUpload(async (formValues) => {
+      try {
+        const formData = new FormData();
+        formData.append('subject', formValues.subject);
+        formData.append('title', formValues.title);
+        formData.append('description', formValues.description);
+        formData.append('chapter', formValues.chapter);
+        formData.append('guidelines', formValues.guidelines);
+        formData.append('document', formValues.file);
 
-      await api.post('/teacher/documents', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+        await api.post('/teacher/documents', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
 
-      setUploadDialog(false);
-      setUploadForm({ subject: 'math', title: '', description: '', chapter: '', guidelines: '', file: null });
-      loadData();
-      alert('Document uploaded successfully!');
-    } catch (error) {
-      console.error('Upload failed:', error);
-      alert('Failed to upload document');
-    }
+        setUploadDialog(false);
+        setUploadForm({ subject: 'math', title: '', description: '', chapter: '', guidelines: '', file: null });
+
+        loadData();
+        show('Document uploaded successfully!', 'success');
+      } catch (error) {
+        console.error('Upload failed:', error);
+        show('Failed to upload document', 'error');
+      }
+    });
   };
 
   const viewStudentSessions = async (student) => {
@@ -163,6 +257,7 @@ export default function TeacherDashboard() {
       setSessionDialog(true);
     } catch (error) {
       console.error('Failed to load sessions:', error);
+      show('Failed to load sessions', 'error');
     }
   };
 
@@ -174,6 +269,7 @@ export default function TeacherDashboard() {
       setSessionDialog(true);
     } catch (error) {
       console.error('Failed to load sessions:', error);
+      show('Failed to load sessions', 'error');
     }
   };
 
@@ -186,12 +282,13 @@ export default function TeacherDashboard() {
       await api.post(`/teacher/sessions/${selectedSession.id}/evaluate`, evaluation);
       setEvaluationDialog(false);
       setEvaluation({ rating: 5, feedback: '' });
-      alert('Evaluation submitted successfully!');
+      show('Evaluation submitted successfully!', 'success');
       if (selectedStudent) {
         viewStudentSessions(selectedStudent);
       }
     } catch (error) {
       console.error('Evaluation failed:', error);
+      show('Failed to submit evaluation', 'error');
     }
   };
 
@@ -241,7 +338,21 @@ export default function TeacherDashboard() {
               }}
             >
               {teacherTabs.map((tab) => (
-                <Tab key={tab.label} label={tab.label} icon={tab.icon} iconPosition="start" />
+                <Tab
+                  key={tab.label}
+                  label={tab.label}
+                  icon={tab.icon}
+                  iconPosition="start"
+                  ref={
+                    tab.label === 'My AI Tutors'
+                      ? tourRefs.aiTutorsTab
+                      : tab.label === 'Content Library'
+                        ? tourRefs.contentLibrary
+                        : tab.label === 'Analytics'
+                          ? tourRefs.analyticsTab
+                          : null
+                  }
+                />
               ))}
             </Tabs>
           </Box>
@@ -281,83 +392,87 @@ export default function TeacherDashboard() {
       </Drawer>
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
-
         {/* Tab 0: Students */}
         {tabValue === 0 && (
           <Grid container spacing={3}>
             <Grid item xs={12}>
-              <Paper sx={{ p: 3 }}>
+              <Paper ref={tourRefs.studentsTable} sx={{ p: 3 }}>
                 <Typography variant="h6" gutterBottom>
                   Student Overview
                 </Typography>
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Name</TableCell>
-                        <TableCell>Grade</TableCell>
-                        <TableCell>Recent Sessions</TableCell>
-                      {subjects.map((subject) => (
-                        <TableCell key={subject.id}>
-                          {subject.icon} {subject.label} Mastery
-                        </TableCell>
-                      ))}
-                        <TableCell>Flags</TableCell>
-                        <TableCell>Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {students.map((student) => (
-                        <TableRow key={student.id}>
-                          <TableCell>
-                            {student.firstName} {student.lastName}
-                          </TableCell>
-                          <TableCell>{student.grade || 'N/A'}</TableCell>
-                          <TableCell>{student.recentSessions}</TableCell>
+                {loading ? (
+                  <StudentTableSkeleton rows={5} cols={4} />
+                ) : students.length === 0 ? (
+                  <EmptyState icon="👥" title="No students yet" description="Students will appear here once they are added to your classroom." />
+                ) : (
+                  <TableContainer>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Name</TableCell>
+                          <TableCell>Grade</TableCell>
+                          <TableCell>Recent Sessions</TableCell>
                           {subjects.map((subject) => (
                             <TableCell key={subject.id}>
-                              {student.pfsmState?.masteryLevels?.[subject.id] ? (
-                                <Box>
-                                  <LinearProgress
-                                    variant="determinate"
-                                    value={student.pfsmState.masteryLevels[subject.id] * 100}
-                                    sx={{ width: 100, mb: 0.5 }}
-                                  />
-                                  <Typography variant="caption">
-                                    {(student.pfsmState.masteryLevels[subject.id] * 100).toFixed(0)}%
-                                  </Typography>
-                                </Box>
-                              ) : (
-                                'N/A'
-                              )}
+                              {subject.icon} {subject.label} Mastery
                             </TableCell>
                           ))}
-                          <TableCell>
-                            {student.pfsmState?.orientationFlags?.length > 0 ? (
-                              <Chip
-                                label={student.pfsmState.orientationFlags[0].type}
-                                size="small"
-                                color="warning"
-                              />
-                            ) : (
-                              <Chip label="No flags" size="small" color="success" />
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              startIcon={<Visibility />}
-                              onClick={() => viewStudentSessions(student)}
-                            >
-                              View Sessions
-                            </Button>
-                          </TableCell>
+                          <TableCell>Flags</TableCell>
+                          <TableCell>Actions</TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                      </TableHead>
+                      <TableBody>
+                        {students.map((student) => (
+                          <TableRow key={student.id}>
+                            <TableCell>
+                              {student.firstName} {student.lastName}
+                            </TableCell>
+                            <TableCell>{student.grade || 'N/A'}</TableCell>
+                            <TableCell>{student.recentSessions}</TableCell>
+                            {subjects.map((subject) => (
+                              <TableCell key={subject.id}>
+                                {student.pfsmState?.masteryLevels?.[subject.id] ? (
+                                  <Box>
+                                    <LinearProgress
+                                      variant="determinate"
+                                      value={student.pfsmState.masteryLevels[subject.id] * 100}
+                                      sx={{ width: 100, mb: 0.5 }}
+                                    />
+                                    <Typography variant="caption">
+                                      {(student.pfsmState.masteryLevels[subject.id] * 100).toFixed(0)}%
+                                    </Typography>
+                                  </Box>
+                                ) : (
+                                  'N/A'
+                                )}
+                              </TableCell>
+                            ))}
+                            <TableCell>
+                              {student.pfsmState?.orientationFlags?.length > 0 ? (
+                                <Chip
+                                  label={student.pfsmState.orientationFlags[0].type}
+                                  size="small"
+                                  color="warning"
+                                />
+                              ) : (
+                                <Chip label="None" size="small" color="success" />
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                size="small"
+                                startIcon={<Visibility />}
+                                onClick={() => viewStudentSessions(student)}
+                              >
+                                View Sessions
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
               </Paper>
             </Grid>
           </Grid>
@@ -424,6 +539,53 @@ export default function TeacherDashboard() {
                     ))}
                   </Box>
                 </Box>
+
+                {subjectFilter !== 'all' && (
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Recent Sessions for {subjectFilter.toUpperCase()}
+                    </Typography>
+                    {subjectSessionsLoading ? (
+                      <SessionListSkeleton rows={4} />
+                    ) : subjectSessionsError ? (
+                      <EmptyState
+                        variant="error"
+                        icon="🤖"
+                        title="Couldn't load sessions"
+                        description="Please try again in a moment."
+                        actionLabel="Retry"
+                        onAction={() => loadSubjectSessions(subjectFilter)}
+                      />
+                    ) : subjectSessions.length === 0 ? (
+                      <EmptyState
+                        icon="🤖"
+                        title="No sessions for this subject"
+                        description="Students haven't asked questions in this subject yet."
+                      />
+                    ) : (
+                      <TableContainer>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Student</TableCell>
+                              <TableCell>Outcome</TableCell>
+                              <TableCell>Date</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {subjectSessions.map((session) => (
+                              <TableRow key={session.id}>
+                                <TableCell>{session.studentName || 'Student'}</TableCell>
+                                <TableCell>{session.outcome || 'N/A'}</TableCell>
+                                <TableCell>{new Date(session.createdAt).toLocaleDateString()}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    )}
+                  </Box>
+                )}
               </Paper>
             </Grid>
           </Grid>
@@ -436,6 +598,7 @@ export default function TeacherDashboard() {
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                 <Typography variant="h6">Course Documents</Typography>
                 <Button
+                  ref={tourRefs.uploadButton}
                   variant="contained"
                   startIcon={<Upload />}
                   onClick={() => setUploadDialog(true)}
@@ -445,7 +608,18 @@ export default function TeacherDashboard() {
               </Box>
             </Grid>
 
-            {documents.map((doc) => (
+            {loading ? (
+              <DocumentCardSkeleton count={3} />
+            ) : documents.length === 0 ? (
+              <EmptyState
+                icon="📄"
+                title="No documents uploaded"
+                description="Upload your first course document to power the AI tutor."
+                actionLabel="Upload document"
+                onAction={() => setUploadDialog(true)}
+              />
+            ) : (
+              documents.map((doc) => (
               <Grid item xs={12} md={6} lg={4} key={doc.id}>
                 <Card>
                   <CardContent>
@@ -481,7 +655,7 @@ export default function TeacherDashboard() {
                   </CardContent>
                 </Card>
               </Grid>
-            ))}
+            ))) }
           </Grid>
         )}
 
@@ -592,10 +766,14 @@ export default function TeacherDashboard() {
           <TextField
             fullWidth
             select
+            name="subject"
             label="Subject"
             value={uploadForm.subject}
-            onChange={(e) => setUploadForm({ ...uploadForm, subject: e.target.value })}
+            onChange={handleUploadChange}
+            onBlur={handleUploadBlur}
             margin="normal"
+            error={Boolean(uploadTouched.subject && uploadErrors.subject)}
+            helperText={uploadTouched.subject ? uploadErrors.subject : ''}
           >
             {subjects.map((subject) => (
               <MenuItem key={subject.id} value={subject.id}>
@@ -606,16 +784,22 @@ export default function TeacherDashboard() {
           <TextField
             fullWidth
             label="Title"
+            name="title"
             value={uploadForm.title}
-            onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
+            onChange={handleUploadChange}
+            onBlur={handleUploadBlur}
             margin="normal"
+            error={Boolean(uploadTouched.title && uploadErrors.title)}
+            helperText={uploadTouched.title ? uploadErrors.title : ''}
             required
           />
           <TextField
             fullWidth
             label="Description"
+            name="description"
             value={uploadForm.description}
-            onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
+            onChange={handleUploadChange}
+            onBlur={handleUploadBlur}
             margin="normal"
             multiline
             rows={2}
@@ -623,15 +807,19 @@ export default function TeacherDashboard() {
           <TextField
             fullWidth
             label="Chapter"
+            name="chapter"
             value={uploadForm.chapter}
-            onChange={(e) => setUploadForm({ ...uploadForm, chapter: e.target.value })}
+            onChange={handleUploadChange}
+            onBlur={handleUploadBlur}
             margin="normal"
           />
           <TextField
             fullWidth
             label="Teaching Guidelines"
+            name="guidelines"
             value={uploadForm.guidelines}
-            onChange={(e) => setUploadForm({ ...uploadForm, guidelines: e.target.value })}
+            onChange={handleUploadChange}
+            onBlur={handleUploadBlur}
             margin="normal"
             multiline
             rows={4}
@@ -644,9 +832,14 @@ export default function TeacherDashboard() {
               type="file"
               hidden
               accept=".pdf,.txt,.doc,.docx"
-              onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files[0] })}
+              onChange={(e) => setUploadForm((prev) => ({ ...prev, file: e.target.files[0] || null }))}
             />
           </Button>
+          {uploadTouched.file && uploadErrors.file && (
+            <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+              {uploadErrors.file}
+            </Typography>
+          )}
           {uploadForm.file && (
             <Typography variant="body2" sx={{ mt: 1 }}>
               Selected: {uploadForm.file.name}
@@ -857,6 +1050,8 @@ export default function TeacherDashboard() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {startTour && <TourEngine steps={tourConfigs.teacher} refs={tourRefs} />}
     </Box>
   );
 }
