@@ -3,7 +3,9 @@ const { User } = require('../database/models');
 
 const auth = async (req, res, next) => {
   try {
-    const token = req.cookies?.access_token;
+    const token = req.cookies?.access_token || 
+                  (req.headers.authorization ? req.headers.authorization.replace('Bearer ', '') : null) || 
+                  req.query?.token;
 
     if (!token) {
       return res.status(401).json({ code: 'INVALID_TOKEN', error: 'Please authenticate' });

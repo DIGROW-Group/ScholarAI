@@ -20,41 +20,36 @@ class TutorAgent {
     
     const subjectName = subjectNames[this.subject] || this.subject.toUpperCase();
     
-    const basePrompt = `You are an expert ${subjectName} tutor working in an advanced AI tutoring system for Moroccan students (École Marocaine des Sciences de l'Ingénieur). Your goal is to help students learn through effective pedagogy, not just give answers.
+    const basePrompt = `Tu es un tuteur expert en ${subjectName} dans un système pédagogique pour les étudiants de l'EMSI (École Marocaine des Sciences de l'Ingénieur).
 
-Student Context:
+CONSIGNES STRICTES :
+1. Tu dois TOUJOURS répondre en FRANÇAIS.
+2. Tu dois te baser STRICTEMENT sur les supports de cours du professeur ("SUPPORT DU PROFESSEUR") fournis ci-dessous.
+3. Ne réinvente JAMAIS de fausses équations ou formules mathématiques. Utilise uniquement les formules réelles indiquées dans le cours.
+4. Cite systématiquement le document source : "[Source: NomDuDocument]".
+5. Guide l'élève étape par étape de manière encourageante.
+6. HORS-SUJET : Si la question ne figure PAS dans le support de cours du professeur, indique clairement à l'élève que le sujet n'est pas couvert dans le support de cours transmis par le professeur.
+
+Contexte élève :
 ${studentContext}
 
-Current Mode: ${mode.toUpperCase()}
-
-Guidelines:
-- ALWAYS cite sources when using information from course materials. Format: "[Source: DocumentName]"
-- Never give the full answer immediately unless the student has genuinely tried multiple steps
-- Be encouraging and supportive, especially if the student is struggling
-- Adjust your language to be clear and age-appropriate
-- Break complex problems into manageable steps`;
+Mode actuel : ${mode.toUpperCase()}`;
 
     const modeSpecificPrompts = {
-      recall: `\n\nRECALL MODE:
-- Ask the student to recall relevant concepts, formulas, or prior knowledge
-- Prompt with questions like "What do you remember about...?" or "Can you think of a formula that might help?"
-- Help activate their existing knowledge before diving into the problem
-- If they can't recall, provide a gentle hint to jog their memory`,
+      recall: `\n\nMODE RAPPEL :
+- Demande à l'élève de se rappeler des concepts et formules clés du support du professeur.
+- Pose une question de guidage comme : "Que te rappelles-tu du cours du professeur concernant cette formule ?"
+- Aide-le à réactiver ses connaissances à partir du document transmis.`,
 
-      diagnostic: `\n\nDIAGNOSTIC MODE:
-- The student has attempted something or is stuck - figure out WHY
-- Ask probing questions: "Can you explain your reasoning?" or "Which part is confusing?"
-- Identify the specific misconception or knowledge gap
-- Don't correct immediately - first understand their thinking
-- Note any patterns that might indicate deeper misunderstandings`,
+      diagnostic: `\n\nMODE DIAGNOSTIC :
+- L'élève hésite ou est bloqué : identifie la formule du cours qui lui manque.
+- Pose une question ciblée : "Quelle partie de la formule du cours te semble difficile ?"
+- Corrige avec bienveillance en rappelant la règle exacte du professeur.`,
 
-      scaffold: `\n\nSCAFFOLD MODE:
-- Provide graduated hints and guidance, not the full solution
-- Break the problem into smaller sub-questions
-- Give the next step or a partial solution, then wait for the student to continue
-- Use leading questions: "What if you tried...?" or "Have you considered...?"
-- Only give more direct help if the student is truly stuck after multiple attempts
-- Celebrate small wins as they progress through steps`
+      scaffold: `\n\nMODE GUIDAGE PAS À PAS :
+- Donne un indice progressif basé sur le cours du professeur, sans donner directement tout le résultat final.
+- Décompose le calcul en sous-étapes simples suivant la méthode du professeur.
+- Invite l'élève à calculer la première étape.`
     };
 
     return basePrompt + (modeSpecificPrompts[mode] || '');
@@ -120,11 +115,24 @@ Learning Style: ${learningStyle}
 
   async generateResponse(studentId, question, conversation = []) {
     try {
+      // Handle simple greetings gracefully
+      const textLower = (question || '').trim().toLowerCase().replace(/[^\w\s]/gi, '');
+      const greetings = ['salut', 'bonjour', 'hello', 'hi', 'coucou', 'bonsoir', 'hola'];
+      if (greetings.includes(textLower)) {
+        const subName = this.subject === 'math' ? 'Mathématiques' : this.subject === 'physics' ? 'Physique-Chimie' : this.subject;
+        return {
+          answer: `Bonjour ! 👋 Je suis votre tuteur IA pour le cours de **${subName}**. Quelle notion ou question souhaitez-vous réviser ensemble aujourd'hui ?`,
+          mode: 'recall',
+          sources: [],
+          hintsGiven: 0
+        };
+      }
+
       // Get student's PFSM state
       const pfsmState = await PFSM.findOne({ where: { studentId } });
       
-      // Retrieve relevant course materials using RAG
-      const ragResults = await RAGService.queryDocuments(this.subject, question, 3);
+      // Retrieve relevant course materials using RAG (Top 1 most relevant course document)
+      const ragResults = await RAGService.queryDocuments(this.subject, question, 1);
       
       // Get teacher's guidelines for this subject
       const { CourseDocument } = require('../database/models');
@@ -133,29 +141,30 @@ Learning Style: ${learningStyle}
           subject: this.subject,
           guidelines: { [require('sequelize').Op.ne]: null }
         },
-        attributes: ['guidelines'],
+        attributes: ['title', 'chapter', 'guidelines'],
         limit: 5
       });
       
       // Build context from retrieved documents
       let retrievedContext = '';
-      if (ragResults.documents.length > 0) {
-        retrievedContext = '\n\nRelevant Course Materials:\n';
+      if (ragResults.documents && ragResults.documents.length > 0) {
+        retrievedContext = '\n\nTEACHER COURSE MATERIALS (SUPPORT DU PROFESSEUR):\n';
         ragResults.documents.forEach((doc, idx) => {
-          const meta = ragResults.metadatas[idx];
-          retrievedContext += `\n[Document: ${meta.title || 'Unknown'}]\n${doc}\n`;
+          const meta = ragResults.metadatas[idx] || {};
+          const title = meta.title || meta.documentTitle || 'Support de cours';
+          retrievedContext += `\n[Document: ${title}]\n${doc}\n`;
         });
       }
 
       // Add teacher guidelines
       if (documentsWithGuidelines.length > 0) {
-        retrievedContext += '\n\nTeacher Guidelines & Instructions:\n';
+        retrievedContext += '\n\nTEACHER GUIDELINES & INSTRUCTIONS (CONSIGNES DU PROFESSEUR):\n';
         documentsWithGuidelines.forEach((doc) => {
           if (doc.guidelines) {
-            retrievedContext += `\n${doc.guidelines}\n`;
+            retrievedContext += `\n[Document "${doc.title}"]: ${doc.guidelines}\n`;
           }
         });
-        retrievedContext += '\nIMPORTANT: Follow these teacher guidelines closely in your tutoring approach.\n';
+        retrievedContext += '\nIMPORTANT: You must strictly respect these teacher guidelines and course contents.\n';
       }
 
       // Determine appropriate tutoring mode
@@ -206,8 +215,8 @@ Learning Style: ${learningStyle}
         pfsm = await PFSM.create({ studentId });
       }
 
-      // Update mastery levels based on outcome
-      const masteryLevels = pfsm.masteryLevels || {};
+      // Update mastery levels based on outcome (cloning to avoid Sequelize JSONB change detection issue)
+      const masteryLevels = { ...(pfsm.masteryLevels || {}) };
       const currentMastery = masteryLevels[this.subject] || 0.5;
 
       if (outcome === 'solved') {
@@ -216,13 +225,13 @@ Learning Style: ${learningStyle}
         masteryLevels[this.subject] = Math.max(0.0, currentMastery - 0.02);
       }
 
-      // Update engagement metrics
-      const engagementMetrics = pfsm.engagementMetrics || {};
+      // Update engagement metrics (cloning to avoid Sequelize JSONB change detection issue)
+      const engagementMetrics = { ...(pfsm.engagementMetrics || {}) };
       engagementMetrics.totalSessions = (engagementMetrics.totalSessions || 0) + 1;
       engagementMetrics[`${this.subject}Sessions`] = (engagementMetrics[`${this.subject}Sessions`] || 0) + 1;
 
-      // Add to recent interactions
-      const recentInteractions = pfsm.recentInteractions || [];
+      // Add to recent interactions (cloning to avoid Sequelize JSONB change detection issue)
+      const recentInteractions = [ ...(pfsm.recentInteractions || []) ];
       recentInteractions.unshift({
         subject: this.subject,
         outcome,

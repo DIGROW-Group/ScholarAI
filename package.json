@@ -5,8 +5,8 @@
   "main": "server/index.js",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "server": "nodemon server/index.js",
-    "client": "cd client && npm start",
+    "server": "wsl sh -c \"cd '/mnt/c/Users/user/PROJET IA/ScholarAI' && node server/index.js\"",
+    "client": "cd client && npx cross-env BROWSER=none PORT=3000 npm start",
     "build": "cd client && npm run build",
     "install-all": "npm install && cd client && npm install",
     "db:migrate": "node server/database/migrations/runMigrations.js",
@@ -40,6 +40,7 @@
     "pdf-parse": "^1.1.1",
     "pg": "^8.11.3",
     "pg-hstore": "^2.3.4",
+    "puppeteer-core": "^25.1.0",
     "sequelize": "^6.37.1",
     "winston": "^3.11.0"
   },

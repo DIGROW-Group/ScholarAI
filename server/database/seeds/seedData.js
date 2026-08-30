@@ -1,8 +1,13 @@
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const { User, PFSM, ParentStudent, CourseDocument, Attendance, Classroom, StudentClassroom, TeacherClassroom } = require('../models');
+
+const sequelize = require('../../config/database');
 
 async function seedDatabase() {
   try {
-    console.log('🌱 Seeding database with sample data...\n');
+    console.log('🌱 Syncing database and seeding sample data...\n');
+    await sequelize.sync({ alter: true });
 
     // Check if admin exists, create if not
     let admin = await User.findOne({ where: { email: 'admin@school.ma' } });
@@ -344,6 +349,7 @@ async function seedDatabase() {
           title: 'Algebra Fundamentals',
           description: 'Introduction to algebraic concepts and problem-solving',
           chapter: 'Chapter 1',
+          gradeLevel: '2ème Bac',
           tags: ['algebra', 'fundamentals', 'equations'],
           filePath: '/uploads/sample-algebra.pdf',
           fileType: 'application/pdf',

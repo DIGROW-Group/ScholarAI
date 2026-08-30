@@ -30,13 +30,28 @@ exports.askQuestion = async (req, res) => {
       if (!session || session.studentId !== studentId) {
         return res.status(404).json({ error: 'Session not found' });
       }
-      conversation = session.conversation || [];
+      conversation = [ ...(session.conversation || []) ];
+      // Purge any old English hallucination messages from session history
+      conversation = conversation.filter(msg => {
+        if (msg.role === 'assistant' && msg.content) {
+          const isEnglish = /(Sure|Certainly|Here is|To derive|In this case|Step \d|Therefore|Hope this helps|equation|derivative rule)/i.test(msg.content);
+          return !isEnglish;
+        }
+        return true;
+      });
     } else {
+      // Auto-finalize any stale ongoing sessions for this student & subject so they are clean and completed
+      await TutoringSession.update(
+        { outcome: 'solved', completedAt: new Date() },
+        { where: { studentId, subject, outcome: 'ongoing' } }
+      ).catch(() => {});
+
       session = await TutoringSession.create({
         studentId,
         subject,
         question,
-        conversation: []
+        conversation: [],
+        outcome: 'ongoing'
       });
 
       // Initialize RL reward tracking
@@ -46,7 +61,7 @@ exports.askQuestion = async (req, res) => {
         state: {}, // Will be populated from PFSM
         actions: [],
         isFinalized: false
-      });
+      }).catch(() => {});
     }
 
     // Get tutor response
@@ -133,10 +148,47 @@ exports.getSessions = async (req, res) => {
       where,
       order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
-      attributes: ['id', 'subject', 'question', 'outcome', 'mode', 'studentRating', 'hintsGiven', 'duration', 'createdAt']
+      attributes: ['id', 'subject', 'question', 'conversation', 'outcome', 'mode', 'studentRating', 'hintsGiven', 'duration', 'createdAt']
     });
 
-    res.json({ sessions });
+    const sessionsWithSummary = sessions.map((sess) => {
+      const conv = sess.conversation || [];
+      const question = sess.question || '';
+      const fullText = question + ' ' + conv.map(m => m.content || '').join(' ');
+      const cleanText = fullText.replace(/\\\(|\\\)|\\\[|\\\]|\\text\{[^}]+\}/g, '').replace(/[*_#`[\]]/g, ' ').toLowerCase();
+
+      let summary = '';
+      if (cleanText.includes('ln') || cleanText.includes('logarithme')) {
+        summary = 'Dérivation & Propriétés de ln(x)';
+      } else if (cleanText.includes('align') || (cleanText.includes('point') && cleanText.includes('complexe'))) {
+        summary = 'Alignement de points complexes';
+      } else if (cleanText.includes('module') && cleanText.includes('complexe')) {
+        summary = 'Module d\'un nombre complexe';
+      } else if (cleanText.includes('euler') || (cleanText.includes('cos') && cleanText.includes('sin'))) {
+        summary = 'Formules d\'Euler & Trigonométrie';
+      } else if (cleanText.includes('integral') || cleanText.includes('primitive')) {
+        summary = 'Calcul d\'Intégrales & Aires';
+      } else if (cleanText.includes('limite') || cleanText.includes('borne')) {
+        summary = 'Calcul de Limites aux bornes';
+      } else if (cleanText.includes('produit scalaire') || cleanText.includes('vecteur')) {
+        summary = 'Produit Scalaire & Géométrie';
+      } else if (cleanText.includes('derive') || cleanText.includes('dérivé')) {
+        summary = 'Calcul Différentiel & Dérivées';
+      } else {
+        const clean = question.replace(/\\\(|\\\)|\\\[|\\\]/g, '').replace(/[*_#]/g, '').trim();
+        summary = clean.length > 55 ? clean.slice(0, 52).trim() + '...' : clean;
+        if (!summary) summary = 'Discussion Tutorat IA';
+      }
+
+      const json = sess.toJSON();
+      delete json.conversation;
+      return {
+        ...json,
+        summary
+      };
+    });
+
+    res.json({ sessions: sessionsWithSummary });
   } catch (error) {
     console.error('Get sessions error:', error);
     res.status(500).json({ error: 'Failed to fetch sessions' });
@@ -218,3 +270,22 @@ exports.calculateReward = async (sessionId) => {
   }
 };
 
+exports.deleteSession = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const studentId = req.user.id;
+
+    const session = await TutoringSession.findByPk(sessionId);
+    if (!session || session.studentId !== studentId) {
+      return res.status(404).json({ error: 'Session non trouvée' });
+    }
+
+    await RLReward.destroy({ where: { sessionId } }).catch(() => {});
+    await session.destroy();
+
+    res.json({ message: 'Discussion supprimée avec succès', sessionId });
+  } catch (error) {
+    console.error('Delete session error:', error);
+    res.status(500).json({ error: 'Échec de la suppression de la discussion' });
+  }
+};

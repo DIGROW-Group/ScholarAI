@@ -1,0 +1,37 @@
+===================================================================
+COURS DE MATHEMATIQUES - EMSI (ECOLE MAROCAINE DES SCIENCES DE L'INGENIEUR)
+Matière : Mathématiques
+Chapitre : Chapitre 3 - Les Dérivées et Leurs Applications
+Enseignant : Prof. El Amrani
+===================================================================
+
+1. DÉFINITION D'UNE DÉRIVÉE
+-------------------------------------------------------------------
+La dérivée d'une fonction f en un point x est la limite du taux d'accroissement :
+f'(x) = lim (h -> 0) [f(x + h) - f(x)] / h
+
+2. FORMULES DE DÉRIVATION FONDAMENTALES (PROPRIÉTÉ DU COURS DU PROFESSEUR)
+-------------------------------------------------------------------
+- Fonction constante : (c)' = 0
+- Fonction puissance : (x^n)' = n * x^(n - 1)
+- Fonction exponentielle : (e^x)' = e^x
+- Logarithme naturel : (ln(x))' = 1 / x
+- Sinus : (sin(x))' = cos(x)
+- Cosinus : (cos(x))' = -sin(x)
+
+3. RÈGLE DES FONCTIONS COMPOSÉES (MÉTHODE EXIGÉE PAR LE PROF. EL AMRANI)
+-------------------------------------------------------------------
+Consigne spécifique de l'enseignant :
+Pour dériver une fonction composée f(g(x)), il faut toujours poser la variable intermédiaire u = g(x) et appliquer la formule :
+(f(g(x)))' = g'(x) * f'(g(x))
+
+Exemple d'application du cours :
+Pour dériver f(x) = (3x + 2)^4 :
+- Poser u = 3x + 2 (donc u' = 3)
+- La fonction devient u^4 dont la dérivée par rapport à u est 4 * u^3
+- En appliquant la règle : f'(x) = 3 * 4 * (3x + 2)^3 = 12 * (3x + 2)^3
+
+4. EXERCICE D'ENTRAÎNEMENT DU COURS
+-------------------------------------------------------------------
+Calculer la dérivée de g(x) = sin(2x + 5).
+Solution : g'(x) = 2 * cos(2x + 5).

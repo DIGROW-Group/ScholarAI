@@ -301,8 +301,8 @@ export default function TourEngine({ steps, refs }) {
       width: targetRect.width,
       height: targetRect.height,
       borderRadius: '12px',
-      border: '2px solid #ea9b20',
-      boxShadow: '0 0 0 4px rgba(234, 155, 32, 0.25), 0 0 0 9999px rgba(0,0,0,0.55)',
+      border: '2px solid #4F46E5',
+      boxShadow: '0 0 0 4px rgba(79, 70, 229, 0.25), 0 0 0 9999px rgba(0,0,0,0.55)',
       transition: baseTransition,
       backgroundColor: 'transparent',
       zIndex: 2000,
@@ -311,7 +311,7 @@ export default function TourEngine({ steps, refs }) {
         position: 'absolute',
         inset: -8,
         borderRadius: '16px',
-        border: '2px solid rgba(234, 155, 32, 0.35)',
+        border: '2px solid rgba(79, 70, 229, 0.35)',
         transformOrigin: 'center',
         animation: prefersReducedMotion ? 'none' : 'tourPulse 1.6s ease-in-out infinite',
       },
@@ -453,7 +453,7 @@ export default function TourEngine({ steps, refs }) {
                       height: 8,
                       borderRadius: 4,
                       '& .MuiLinearProgress-bar': {
-                        backgroundColor: '#ea9b20',
+                        backgroundColor: '#4F46E5',
                       },
                     }}
                   />
@@ -482,11 +482,11 @@ export default function TourEngine({ steps, refs }) {
                       variant="contained"
                       onClick={handleNext}
                       sx={{
-                        backgroundColor: '#ea9b20',
+                        backgroundColor: '#4F46E5',
                         textTransform: 'none',
                         fontWeight: 700,
                         '&:hover': {
-                          backgroundColor: '#d68918',
+                          backgroundColor: '#3730A3',
                         },
                       }}
                     >
@@ -507,12 +507,12 @@ export default function TourEngine({ steps, refs }) {
                               width: 16,
                               height: 16,
                               borderRadius: '50%',
-                              backgroundColor: 'rgba(234,155,32,0.15)',
+                              backgroundColor: 'rgba(79,70,229,0.15)',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              color: '#ea9b20',
-                              border: '1px solid rgba(234,155,32,0.5)',
+                              color: '#4F46E5',
+                              border: '1px solid rgba(79,70,229,0.5)',
                             }}
                           >
                             <Check sx={{ fontSize: 12 }} />
@@ -527,8 +527,8 @@ export default function TourEngine({ steps, refs }) {
                             width: 10,
                             height: 10,
                             borderRadius: '50%',
-                            backgroundColor: isCurrent ? '#ea9b20' : 'transparent',
-                            border: isCurrent ? '1px solid #ea9b20' : '1px solid rgba(0,0,0,0.25)',
+                            backgroundColor: isCurrent ? '#4F46E5' : 'transparent',
+                            border: isCurrent ? '1px solid #4F46E5' : '1px solid rgba(0,0,0,0.25)',
                           }}
                         />
                       );

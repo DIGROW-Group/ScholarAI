@@ -3,6 +3,7 @@ import { getConfig } from '../config/appConfig';
 import {
   Box,
   Container,
+  Avatar,
   Paper,
   Typography,
   AppBar,
@@ -57,14 +58,18 @@ import {
   Cancel,
   AttachMoney,
   AccountBalance,
+  PersonAdd,
   Calculate,
   Science,
   Language,
   Computer,
   Menu as MenuIcon,
+  Brightness4,
+  Brightness7,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useSnackbar } from '../context/SnackbarContext';
+import { useColorMode } from '../context/ColorModeContext';
 import api from '../services/api';
 import TourEngine from '../components/OnboardingTour/TourEngine';
 import { tourConfigs } from '../components/OnboardingTour/tourConfigs';
@@ -77,6 +82,7 @@ import useForm from '../hooks/useForm';
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
   const { show } = useSnackbar();
+  const colorMode = useColorMode();
   const config = getConfig();
   const [teachers, setTeachers] = useState([]);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
@@ -305,12 +311,11 @@ export default function AdminDashboard() {
   const handleCreateStaff = async () => {
     try {
       await api.post('/admin/staff', staffForm);
-      setSuccessMessage(`${staffForm.role === 'teacher' ? 'Teacher' : 'Counselor'} created successfully!`);
+      show(`${staffForm.role === 'teacher' ? 'Teacher' : 'Counselor'} created successfully!`, 'success');
       setCreateStaffDialog(false);
       setStaffForm({ firstName: '', lastName: '', email: '', password: '', role: 'teacher', subjects: [] });
       loadDashboardData();
       loadTeachers();
-      setTimeout(() => setSuccessMessage(''), 5000);
     } catch (error) {
       console.error('Failed to create staff account:', error);
       alert(error.response?.data?.error || 'Failed to create staff account');
@@ -356,7 +361,7 @@ export default function AdminDashboard() {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <AppBar position="static" sx={{ bgcolor: '#757575' }}>
+      <AppBar position="static" color="default" elevation={0} sx={{ bgcolor: '#FFFFFF', borderBottom: '1px solid #E2E8F0' }}>
         <Toolbar>
           <IconButton
             color="inherit"
@@ -365,18 +370,17 @@ export default function AdminDashboard() {
           >
             <MenuIcon />
           </IconButton>
-          <Box sx={{ p: 1, mr: 3 }}>
-            <Box
-              component="img"
-              src={config.logoImage}
-              alt={`${config.name} Logo`}
-              key={`admin-logo-${config.logoImage}`}
-              sx={{
-                height: 72,
-                width: 'auto',
-                objectFit: 'contain',
-              }}
-            />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mr: 4, ml: { xs: 0, md: 2 } }}>
+            <Box sx={{
+              width: 36, height: 36, borderRadius: 1.5,
+              background: 'linear-gradient(135deg, #4F46E5 0%, #818CF8 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <School sx={{ fontSize: 20, color: '#fff' }} />
+            </Box>
+            <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ letterSpacing: '-0.01em', display: { xs: 'none', sm: 'block' } }}>
+              ScholarAI
+            </Typography>
           </Box>
           <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
             <Tabs 
@@ -389,13 +393,13 @@ export default function AdminDashboard() {
                   textTransform: 'none',
                   fontSize: '0.95rem',
                   fontWeight: 500,
-                  color: 'rgba(255, 255, 255, 0.7)',
+                  color: 'text.secondary',
                   '&.Mui-selected': {
-                    color: 'white',
+                    color: 'primary.main',
                   }
                 },
                 '& .MuiTabs-indicator': {
-                  backgroundColor: 'white',
+                  backgroundColor: 'primary.main',
                 }
               }}
             >
@@ -404,11 +408,33 @@ export default function AdminDashboard() {
               ))}
             </Tabs>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" sx={{ mr: 2 }}>
-              {user?.firstName} {user?.lastName}
-            </Typography>
-            <IconButton color="inherit" onClick={logout}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <IconButton
+              onClick={colorMode.toggleColorMode}
+              title={colorMode.mode === 'dark' ? "Mode Sombre Activé (Cliquer pour Mode Clair)" : "Mode Clair Activé (Cliquer pour Mode Sombre)"}
+              sx={{
+                bgcolor: colorMode.mode === 'dark' ? '#334155' : '#EEF2FF',
+                p: 1,
+                '&:hover': { bgcolor: colorMode.mode === 'dark' ? '#475569' : '#E0E7FF' }
+              }}
+            >
+              {colorMode.mode === 'dark' ? <Brightness7 sx={{ color: '#FCD34D' }} /> : <Brightness4 sx={{ color: '#4F46E5' }} />}
+            </IconButton>
+
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main', color: '#fff', fontSize: '1rem', fontWeight: 600 }}>
+                {user?.firstName?.charAt(0) || 'A'}
+              </Avatar>
+              <Box sx={{ display: { xs: 'none', sm: 'block' }, textAlign: 'right' }}>
+                <Typography variant="body2" fontWeight={600} color="text.primary" sx={{ lineHeight: 1.2 }}>
+                  {user?.firstName === 'Admin' && user?.lastName === 'Admin' ? 'Administrator' : `${user?.firstName} ${user?.lastName}`}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
+                  {user?.role || 'Admin'}
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={logout} sx={{ color: 'text.secondary', ml: 1 }}>
               <Logout />
             </IconButton>
           </Box>
@@ -445,17 +471,17 @@ export default function AdminDashboard() {
         {tabValue === 0 && (
           <Box>
             {/* Welcome Section */}
-            <Paper sx={{ p: 3, mb: 3, bgcolor: '#757575', color: 'white' }}>
+            <Paper sx={{ p: 3, mb: 3, background: 'linear-gradient(135deg, #4F46E5 0%, #6366F1 50%, #818CF8 100%)', color: 'white', border: 'none' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box>
                   <Typography variant="h4" fontWeight="bold" gutterBottom>
                     Welcome back, {user?.firstName}! 👋
                   </Typography>
                   <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                    Here's an overview of your RMATSS platform
+                    Here's an overview of your ScholarAI platform
                   </Typography>
                 </Box>
-                <AdminPanelSettings sx={{ fontSize: 80, opacity: 0.3 }} />
+                <AdminPanelSettings sx={{ fontSize: 80, opacity: 0.15 }} />
               </Box>
             </Paper>
 
@@ -478,7 +504,7 @@ export default function AdminDashboard() {
                 </Grid>
               ) : null}
               <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ background: 'linear-gradient(135deg, #ea9b20 0%, #FFB84D 100%)', color: 'white', height: '100%' }}>
+                <Card sx={{ background: 'linear-gradient(135deg, #4F46E5 0%, #818CF8 100%)', color: 'white', height: '100%' }}>
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <Box>
@@ -492,7 +518,7 @@ export default function AdminDashboard() {
               </Grid>
 
               <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ background: 'linear-gradient(135deg, #ea9b20 0%, #FFB84D 100%)', color: 'white', height: '100%' }}>
+                <Card sx={{ background: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)', color: 'white', height: '100%' }}>
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <Box>
@@ -506,7 +532,7 @@ export default function AdminDashboard() {
               </Grid>
 
               <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ background: 'linear-gradient(135deg, #ea9b20 0%, #FFB84D 100%)', color: 'white', height: '100%' }}>
+                <Card sx={{ background: 'linear-gradient(135deg, #3B82F6 0%, #93C5FD 100%)', color: 'white', height: '100%' }}>
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <Box>
@@ -520,7 +546,7 @@ export default function AdminDashboard() {
               </Grid>
 
               <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ background: 'linear-gradient(135deg, #ea9b20 0%, #FFB84D 100%)', color: 'white', height: '100%' }}>
+                <Card sx={{ background: 'linear-gradient(135deg, #F59E0B 0%, #FCD34D 100%)', color: 'white', height: '100%' }}>
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <Box>
@@ -595,8 +621,8 @@ export default function AdminDashboard() {
                       return (
                         <Grid item xs={6} key={subject.id}>
                           <Card sx={{ 
-                            background: 'linear-gradient(135deg, #ea9b2015 0%, #FFB84D15 100%)',
-                            border: '1px solid #ea9b2030',
+                            background: 'linear-gradient(135deg, rgba(79,70,229,0.06) 0%, rgba(129,140,248,0.06) 100%)',
+                            border: '1px solid rgba(79,70,229,0.15)',
                             transition: 'all 0.2s',
                             '&:hover': {
                               boxShadow: 3,
@@ -756,10 +782,10 @@ export default function AdminDashboard() {
                   {classrooms.map((classroom) => {
                   // Determine card color based on grade (orange/yellow variants)
                   const getCardColor = (grade) => {
-                    if (grade.includes('1ere')) return '#C77A0A'; // Dark orange
-                    if (grade.includes('2eme')) return '#ea9b20'; // Medium orange
-                    if (grade.includes('3eme')) return '#FFB84D'; // Light orange
-                    return '#FFB84D'; // Lighter orange default
+                    if (grade.includes('1ere')) return '#3730A3';
+                    if (grade.includes('2eme')) return '#4F46E5';
+                    if (grade.includes('3eme')) return '#6366F1';
+                    return '#818CF8';
                   };
 
                   const cardColor = getCardColor(classroom.grade);
@@ -881,9 +907,9 @@ export default function AdminDashboard() {
                 startIcon={<PersonAdd />}
                 onClick={() => setCreateStaffDialog(true)}
                 sx={{
-                  background: 'linear-gradient(135deg, #ea9b20 0%, #FFB84D 100%)',
+                  background: 'linear-gradient(135deg, #4F46E5 0%, #818CF8 100%)',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #C77A0A 0%, #ea9b20 100%)',
+                    background: 'linear-gradient(135deg, #3730A3 0%, #4F46E5 100%)',
                   }
                 }}
               >
@@ -931,7 +957,7 @@ export default function AdminDashboard() {
                               width: 56,
                               height: 56,
                               borderRadius: '50%',
-                              background: 'linear-gradient(135deg, #ea9b20 0%, #FFB84D 100%)',
+                              background: 'linear-gradient(135deg, #4F46E5 0%, #818CF8 100%)',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -968,8 +994,8 @@ export default function AdminDashboard() {
                                   label={subject.label}
                                   size="small"
                                   sx={{
-                                    background: 'linear-gradient(135deg, #ea9b2015 0%, #FFB84D15 100%)',
-                                    border: '1px solid #ea9b2030',
+                                    background: 'linear-gradient(135deg, rgba(79,70,229,0.06) 0%, rgba(129,140,248,0.06) 100%)',
+                                    border: '1px solid rgba(79,70,229,0.15)',
                                     fontWeight: 'bold'
                                   }}
                                 />
@@ -991,9 +1017,9 @@ export default function AdminDashboard() {
                           startIcon={<Edit />}
                           onClick={() => handleEditTeacher(teacher)}
                           sx={{
-                            background: 'linear-gradient(135deg, #ea9b20 0%, #FFB84D 100%)',
+                            background: 'linear-gradient(135deg, #4F46E5 0%, #818CF8 100%)',
                             '&:hover': {
-                              background: 'linear-gradient(135deg, #C77A0A 0%, #ea9b20 100%)',
+                              background: 'linear-gradient(135deg, #3730A3 0%, #4F46E5 100%)',
                             }
                           }}
                         >

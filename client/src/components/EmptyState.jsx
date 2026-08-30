@@ -1,15 +1,21 @@
 import React from 'react';
 import { Box, Typography, Button } from '@mui/material';
+import { InboxOutlined, ErrorOutline } from '@mui/icons-material';
 
 export default function EmptyState({
-  icon = '📭',
-  title = 'No items',
+  icon,
+  title = 'Aucune donnée',
   description = '',
   actionLabel,
   onAction,
   variant = 'empty',
 }) {
   const isError = variant === 'error';
+  const defaultIcon = isError ? (
+    <ErrorOutline sx={{ fontSize: 44, color: '#EF4444' }} />
+  ) : (
+    <InboxOutlined sx={{ fontSize: 44, color: '#94A3B8' }} />
+  );
 
   return (
     <Box
@@ -18,26 +24,35 @@ export default function EmptyState({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        p: 3,
-        border: '1.5px dashed',
-        borderColor: isError ? '#d32f2f' : 'grey.200',
+        p: 4,
+        border: '1px dashed',
+        borderColor: isError ? '#FCA5A5' : '#E2E8F0',
         borderRadius: 3,
-        bgcolor: isError ? '#fff5f5' : '#fafafa',
+        bgcolor: isError ? '#FEF2F2' : '#F8FAFC',
         textAlign: 'center',
       }}
     >
-      <Typography sx={{ fontSize: 52 }}>{icon}</Typography>
-      <Typography variant="h6" sx={{ fontWeight: 700, mt: 1 }}>{title}</Typography>
+      <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {typeof icon === 'string' ? (
+          <Typography sx={{ fontSize: 36 }}>{icon}</Typography>
+        ) : (
+          icon || defaultIcon
+        )}
+      </Box>
+      <Typography variant="subtitle1" sx={{ fontWeight: 700, mt: 0.5, color: isError ? '#991B1B' : 'text.primary' }}>
+        {title}
+      </Typography>
       {description && (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 320 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, maxWidth: 360, fontSize: '0.85rem' }}>
           {description}
         </Typography>
       )}
       {actionLabel && onAction && (
         <Button
-          variant="contained"
+          variant={isError ? "outlined" : "contained"}
+          color={isError ? "error" : "primary"}
           onClick={onAction}
-          sx={{ mt: 2, bgcolor: '#ea9b20', '&:hover': { bgcolor: '#d78412' } }}
+          sx={{ mt: 2, textTransform: 'none', borderRadius: 2, fontWeight: 600, fontSize: '0.85rem' }}
         >
           {actionLabel}
         </Button>

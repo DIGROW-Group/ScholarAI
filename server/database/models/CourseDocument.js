@@ -43,6 +43,11 @@ const CourseDocument = sequelize.define('CourseDocument', {
     type: DataTypes.STRING,
     allowNull: true
   },
+  gradeLevel: {
+    type: DataTypes.STRING,
+    defaultValue: 'Tous les niveaux',
+    allowNull: true
+  },
   guidelines: {
     type: DataTypes.TEXT,
     allowNull: true,

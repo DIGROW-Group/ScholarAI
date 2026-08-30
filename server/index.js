@@ -1,10 +1,11 @@
-const express = require('express');
+const express = require('express'); // restarted
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const cron = require('node-cron');
 const cookieParser = require('cookie-parser');
+const path = require('path');
 const { Op } = require('sequelize');
 require('dotenv').config();
 
@@ -30,6 +31,11 @@ const teacherRoutes = require('./routes/teacher');
 const parentRoutes = require('./routes/parent');
 const adminRoutes = require('./routes/admin');
 const counselorRoutes = require('./routes/counselor');
+const documentRoutes = require('./routes/documents');
+const homeworkRoutes = require('./routes/homework');
+const quizRoutes = require('./routes/quiz');
+const aiRoutes = require('./routes/aiRoutes');
+const dbViewerRoutes = require('./routes/dbViewer');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -53,7 +59,7 @@ app.use(morgan('dev'));
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: 3000 // allow up to 3000 requests per 15 minutes for dashboard polling & real-time features
 });
 app.use('/api/', limiter);
 
@@ -64,6 +70,9 @@ const aiLimiter = rateLimit({
 });
 app.use('/api/tutor/ask', aiLimiter);
 
+// Serve static uploads (documents, homework attachments, student submissions)
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/tutor', tutorRoutes);
@@ -72,6 +81,11 @@ app.use('/api/teacher', teacherRoutes);
 app.use('/api/parent', parentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/counselor', counselorRoutes);
+app.use('/api/documents', documentRoutes);
+app.use('/api/homework', homeworkRoutes);
+app.use('/api/quiz', quizRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/db', dbViewerRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -96,8 +110,8 @@ app.use((err, req, res, next) => {
 async function startServer() {
   try {
     if (process.env.NODE_ENV !== 'production') {
-      await sequelize.sync({ alter: true });
-      console.log('Dev: database synced');
+      await sequelize.authenticate();
+      console.log('Dev: database connection verified');
     } else {
       await sequelize.authenticate();
       console.log('Production: connection verified — migrations handle schema');
@@ -155,7 +169,8 @@ async function startServer() {
       scheduled: true,
       timezone: 'UTC'
     });
-    console.log('✓ Daily refresh token cleanup cron job scheduled (00:00 UTC)');
+    // Initialize RAG Service & Vector Database Collections
+    await RAGService.initialize().catch(err => console.warn('RAGService init notice:', err.message));
 
     // Start server
     app.listen(PORT, () => {

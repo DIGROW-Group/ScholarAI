@@ -1,10 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import { getTheme } from './theme';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SnackbarProvider } from './context/SnackbarContext';
+import { ColorModeProvider } from './context/ColorModeContext';
 
 // Pages
 import Login from './pages/Login';
@@ -15,12 +13,48 @@ import ParentDashboard from './pages/ParentDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import CounselorDashboard from './pages/CounselorDashboard';
 
+import { Box, CircularProgress, Typography, Avatar } from '@mui/material';
+import { School } from '@mui/icons-material';
+
+// Sleek full-page loader component
+const FullPageLoader = () => (
+  <Box
+    sx={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '100vh',
+      bgcolor: '#F8FAFC'
+    }}
+  >
+    <Avatar
+      sx={{
+        width: 64,
+        height: 64,
+        bgcolor: '#4F46E5',
+        boxShadow: '0 10px 25px -5px rgba(79, 70, 229, 0.4)',
+        mb: 3
+      }}
+    >
+      <School sx={{ fontSize: 36, color: '#FFFFFF' }} />
+    </Avatar>
+    <CircularProgress size={30} thickness={4} sx={{ color: '#4F46E5', mb: 2 }} />
+    <Typography variant="subtitle1" fontWeight={700} color="#1E293B" sx={{ letterSpacing: '-0.01em' }}>
+      ScholarAI
+    </Typography>
+    <Typography variant="caption" color="text.secondary">
+      Chargement de votre espace pédagogique...
+    </Typography>
+  </Box>
+);
+
 // Protected Route component
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <FullPageLoader />;
   }
 
   if (!user) {
@@ -57,18 +91,8 @@ const DashboardRouter = () => {
 };
 
 function App() {
-  // Get theme dynamically to ensure it always reflects current APP_MODE
-  // Using useMemo with APP_MODE as dependency would be ideal, but since
-  // APP_MODE is in a config file, we call getTheme() which reads it fresh each time
-  const theme = React.useMemo(() => {
-    const t = getTheme();
-    console.log('App component - Theme loaded:', t.palette.primary.main);
-    return t;
-  }, []); // Empty deps - theme is read from config file
-  
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    <ColorModeProvider>
       <Router>
         <AuthProvider>
           <SnackbarProvider>
@@ -127,7 +151,7 @@ function App() {
           </SnackbarProvider>
         </AuthProvider>
       </Router>
-    </ThemeProvider>
+    </ColorModeProvider>
   );
 }
 

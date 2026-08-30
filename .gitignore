@@ -36,3 +36,8 @@ uploads/*
 # ChromaDB data
 chroma_data/
 
+# Scratch & Temporary
+scratch/
+tmp/
+tools/
+

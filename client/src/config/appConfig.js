@@ -1,9 +1,9 @@
 // Application Configuration
 export const APP_CONFIG = {
-  name: "Destination Success AI",
-  backgroundImage: "/destination_background.png",
-  logoImage: "/destination_logo.png",
-  theme: "destination",
+  name: "ScholarAI",
+  backgroundImage: "/scholar_background.png",
+  logoImage: "/scholar_logo.png",
+  theme: "minimal-pro",
 };
 
 // Get current configuration

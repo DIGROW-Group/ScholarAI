@@ -14,6 +14,13 @@ class GeofencingAgent {
     return hours * 60 + minutes;
   }
 
+  formatMinutes(minutes) {
+    if (minutes < 60) return `${minutes} min`;
+    const hrs = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hrs}h ${mins}min` : `${hrs}h`;
+  }
+
   async checkIn(studentId, time = null, location = 'School') {
     try {
       const checkInTime = time || new Date().toTimeString().split(' ')[0].substring(0, 5);
@@ -36,24 +43,25 @@ class GeofencingAgent {
         await attendance.update({ checkInTime, location });
       }
 
-      // Check for late arrival
+      // Check for late arrival (only for realistic school arrival window <= 3 hours late)
       const checkInMinutes = this.parseTime(checkInTime);
       const schoolStartMinutes = this.parseTime(this.schoolStartTime);
       const lateBy = checkInMinutes - schoolStartMinutes;
 
       const anomalies = [];
 
-      if (lateBy > this.lateThresholdMinutes) {
+      if (lateBy > this.lateThresholdMinutes && lateBy <= 180) {
+        const formattedDelay = this.formatMinutes(lateBy);
         attendance.status = 'late';
         anomalies.push({
           type: 'late_arrival',
-          description: `Checked in ${lateBy} minutes after school start time`,
+          description: `Arrivé(e) avec ${formattedDelay} de retard sur l'horaire de cours`,
           flaggedAt: new Date()
         });
 
         // Create alert for late arrival
-        await this.createAttendanceAlert(studentId, 'warning', 'Late Arrival', 
-          `Student checked in ${lateBy} minutes late at ${checkInTime}`);
+        await this.createAttendanceAlert(studentId, 'warning', 'Retard Signalé', 
+          `Élève enregistré(e) avec ${formattedDelay} de retard à ${checkInTime}`);
       }
 
       if (anomalies.length > 0) {
@@ -88,16 +96,17 @@ class GeofencingAgent {
 
       await attendance.update({ checkOutTime });
 
-      // Check for early departure
+      // Check for early departure (only for realistic early departure window <= 3 hours early)
       const checkOutMinutes = this.parseTime(checkOutTime);
       const schoolEndMinutes = this.parseTime(this.schoolEndTime);
       const earlyBy = schoolEndMinutes - checkOutMinutes;
 
-      if (earlyBy > 30) { // More than 30 minutes early
+      if (earlyBy > 30 && earlyBy <= 180) { // Between 30m and 3h early
+        const formattedEarly = this.formatMinutes(earlyBy);
         const anomalies = attendance.anomalies || [];
         anomalies.push({
           type: 'early_departure',
-          description: `Checked out ${earlyBy} minutes before school end time`,
+          description: `Départ anticipé de ${formattedEarly} avant la fin des cours`,
           flaggedAt: new Date()
         });
 
@@ -106,8 +115,8 @@ class GeofencingAgent {
           status: 'early_departure'
         });
 
-        await this.createAttendanceAlert(studentId, 'info', 'Early Departure',
-          `Student checked out ${earlyBy} minutes early at ${checkOutTime}`);
+        await this.createAttendanceAlert(studentId, 'info', 'Départ Anticipé',
+          `Élève sorti(e) ${formattedEarly} avant l'horaire habituel (${checkOutTime})`);
       }
 
       return attendance;

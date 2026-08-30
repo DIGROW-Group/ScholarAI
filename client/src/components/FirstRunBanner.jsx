@@ -55,7 +55,7 @@ const FirstRunBanner = ({ role, onAction, onDismiss }) => {
       sx={{
         p: 3,
         mb: 3,
-        borderLeft: '6px solid #ea9b20',
+        borderLeft: '6px solid #4F46E5',
         background: 'linear-gradient(135deg, rgba(234, 155, 32, 0.08) 0%, rgba(234, 155, 32, 0.04) 100%)',
         position: 'relative',
         borderRadius: 1,
@@ -93,7 +93,7 @@ const FirstRunBanner = ({ role, onAction, onDismiss }) => {
           <Button
             variant="contained"
             sx={{
-              backgroundColor: '#ea9b20',
+              backgroundColor: '#4F46E5',
               color: 'white',
               textTransform: 'none',
               fontWeight: 600,
